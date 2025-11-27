@@ -1,3 +1,5 @@
+export type CreateWorkflowInput = z.infer<typeof createWorkflowSchema>;
+
 import { Router } from "express";
 import { requireAuth, AuthRequest } from "../middleware/auth.middleware";
 import * as workflowService from "../services/workflow.service";
@@ -9,7 +11,7 @@ const router = Router();
 // All routes require authentication
 router.use(requireAuth);
 
-const createWorkflowSchema = z.object({
+export const createWorkflowSchema = z.object({
   workspaceId: z.string(),
   name: z.string().min(1).max(100),
   description: z.string().optional(),

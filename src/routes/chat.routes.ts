@@ -1,3 +1,6 @@
+export type StartConversationInput = z.infer<typeof startConversationSchema>;
+export type SendMessageInput = z.infer<typeof sendMessageSchema>;
+
 import { Router } from "express";
 import { requireAuth, AuthRequest } from "../middleware/auth.middleware";
 import * as chatService from "../services/chat.service";
@@ -7,7 +10,7 @@ import { z } from "zod";
 const router = Router();
 
 // PUBLIC endpoints (for embedded widget)
-const startConversationSchema = z.object({
+export const startConversationSchema = z.object({
   widgetId: z.string(),
   visitorId: z.string().optional(),
   visitorName: z.string().optional(),
@@ -65,7 +68,7 @@ router.get("/conversations/:id/messages", async (req, res) => {
   }
 });
 
-const sendMessageSchema = z.object({
+export const sendMessageSchema = z.object({
   conversationId: z.string(),
   content: z.string().min(1),
   role: z.enum(["USER", "AGENT"]).optional(),

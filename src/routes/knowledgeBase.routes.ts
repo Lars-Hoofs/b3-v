@@ -1,3 +1,6 @@
+export type CreateKnowledgeBaseInput = z.infer<typeof createKBSchema>;
+export type CreateDocumentInput = z.infer<typeof createDocumentSchema>;
+
 import { Router } from "express";
 import { requireAuth, AuthRequest } from "../middleware/auth.middleware";
 import * as kbService from "../services/knowledgeBase.service";
@@ -9,7 +12,7 @@ const router = Router();
 // All routes require authentication
 router.use(requireAuth);
 
-const createKBSchema = z.object({
+export const createKBSchema = z.object({
   workspaceId: z.string(),
   name: z.string().min(1).max(100),
   description: z.string().optional(),
@@ -18,7 +21,7 @@ const createKBSchema = z.object({
   chunkOverlap: z.number().min(0).max(1000).optional(),
 });
 
-const createDocumentSchema = z.object({
+export const createDocumentSchema = z.object({
   knowledgeBaseId: z.string(),
   title: z.string().min(1).max(200),
   content: z.string().min(1),

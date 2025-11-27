@@ -18,8 +18,8 @@ class SocketService {
   initialize(httpServer: HTTPServer) {
     // Socket.io CORS configuration - secure in production
     const allowedOrigins = env.NODE_ENV === 'development'
-      ? '*' // Allow all in development
-      : [env.BETTER_AUTH_URL]; // Production: only allow auth URL
+      ? ['http://localhost:3000', 'http://localhost:3001', 'https://ai.bonsaimedia.nl']
+      : [env.BETTER_AUTH_URL];
 
     this.io = new SocketIOServer(httpServer, {
       cors: {

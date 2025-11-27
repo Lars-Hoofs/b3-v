@@ -1,5 +1,6 @@
 import { prisma } from "../lib/prisma";
 import { nanoid } from "nanoid";
+import { CreateWidgetInput } from '../routes/widget.routes';
 
 export class WidgetError extends Error {
   constructor(
@@ -11,26 +12,6 @@ export class WidgetError extends Error {
   }
 }
 
-interface CreateWidgetInput {
-  workspaceId: string;
-  agentId: string;
-  name: string;
-  widgetType?: string;
-  position?: string;
-  offsetX?: number;
-  offsetY?: number;
-  primaryColor?: string;
-  theme?: string;
-  greeting?: string;
-  placeholder?: string;
-  suggestedQuestions?: string[];
-  showBranding?: boolean;
-  headerTitle?: string;
-  headerSubtitle?: string;
-  customCss?: string;
-  allowedDomains?: string[];
-  [key: string]: any; // Allow other widget customization fields
-}
 
 export async function createWidget(input: CreateWidgetInput) {
   // Verify agent exists and belongs to workspace

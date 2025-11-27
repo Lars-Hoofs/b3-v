@@ -1,5 +1,6 @@
 import { prisma } from "../lib/prisma";
 import OpenAI from "openai";
+import { CreateKnowledgeBaseInput, CreateDocumentInput } from '../routes/knowledgeBase.routes';
 
 export class KnowledgeBaseError extends Error {
   constructor(
@@ -15,14 +16,6 @@ const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 
-interface CreateKnowledgeBaseInput {
-  workspaceId: string;
-  name: string;
-  description?: string;
-  embeddingModel?: string;
-  chunkSize?: number;
-  chunkOverlap?: number;
-}
 
 export async function createKnowledgeBase(input: CreateKnowledgeBaseInput) {
   const workspace = await prisma.workspace.findFirst({
@@ -118,14 +111,6 @@ export async function deleteKnowledgeBase(kbId: string, workspaceId: string) {
   return { success: true };
 }
 
-interface CreateDocumentInput {
-  knowledgeBaseId: string;
-  title: string;
-  content: string;
-  sourceUrl?: string;
-  metadata?: any;
-  tags?: string[];
-}
 
 export async function createDocument(input: CreateDocumentInput) {
   const kb = await prisma.knowledgeBase.findFirst({

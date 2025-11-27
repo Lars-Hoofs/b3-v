@@ -1,5 +1,6 @@
 import { prisma } from "../lib/prisma";
 import { nanoid } from "nanoid";
+import { CreateAgentInput } from '../routes/agent.routes';
 
 export class AgentError extends Error {
   constructor(
@@ -11,21 +12,6 @@ export class AgentError extends Error {
   }
 }
 
-interface CreateAgentInput {
-  workspaceId: string;
-  name: string;
-  description?: string;
-  avatarUrl?: string;
-  aiModel?: string;
-  temperature?: number;
-  maxTokens?: number;
-  systemPrompt: string;
-  personality?: any;
-  fallbackMessage?: string;
-  knowledgeBaseId?: string;
-  workflowId?: string;
-  customFunctions?: any;
-}
 
 export async function createAgent(input: CreateAgentInput) {
   // Check workspace access

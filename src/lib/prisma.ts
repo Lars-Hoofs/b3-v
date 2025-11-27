@@ -48,11 +48,11 @@ export const prisma = prismaBase.$extends({
       async findMany({ model, operation, args, query }) {
         if (!MODELS_WITHOUT_SOFT_DELETE.has(model)) {
           if (args.where) {
-            if (args.where.deletedAt === undefined) {
-              args.where.deletedAt = null;
+            if ((args.where as any).deletedAt === undefined) {
+              (args.where as any).deletedAt = null;
             }
           } else {
-            args.where = { deletedAt: null };
+            (args as any).where = { deletedAt: null };
           }
         }
         return query(args);
@@ -79,7 +79,7 @@ export const prisma = prismaBase.$extends({
   },
 });
 
-if (process.env.NODE_ENV !== "production") globalForPrisma.prisma = prisma;
+if (process.env.NODE_ENV !== "production") globalForPrisma.prisma = prisma as any;
 
 // Log database connection
 prisma.$connect()

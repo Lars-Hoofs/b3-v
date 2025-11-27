@@ -6,6 +6,7 @@ import * as webhookService from "./webhook.service";
 import * as workflowExecutor from "./workflowExecutor.service";
 import * as presenceService from "./presence.service";
 import logger from '../lib/logger';
+import { StartConversationInput, SendMessageInput } from '../routes/chat.routes';
 
 export class ChatError extends Error {
   constructor(
@@ -21,13 +22,6 @@ const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 
-interface StartConversationInput {
-  widgetId: string;
-  visitorId?: string;
-  visitorName?: string;
-  visitorEmail?: string;
-  visitorMetadata?: any;
-}
 
 export async function startConversation(input: StartConversationInput) {
   const widget = await prisma.widget.findFirst({
@@ -185,13 +179,6 @@ export async function getConversationMessages(
   };
 }
 
-interface SendMessageInput {
-  conversationId: string;
-  content: string;
-  role?: "USER" | "AGENT";
-  senderId?: string;
-  currentPageUrl?: string; // URL of page user is on
-}
 
 export async function sendMessage(input: SendMessageInput) {
   const conversation = await prisma.conversation.findFirst({

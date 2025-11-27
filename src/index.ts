@@ -65,8 +65,8 @@ app.use(helmet({
 // CORS configuration - allow all in development
 app.use(cors({
   origin: process.env.NODE_ENV === 'development'
-    ? true  // Allow all in development
-    : process.env.BETTER_AUTH_URL || "http://localhost:3000",
+    ? ['http://localhost:3000', 'http://localhost:3001', 'https://ai.bonsaimedia.nl']
+    : [process.env.BETTER_AUTH_URL, 'https://ai.bonsaimedia.nl'].filter(Boolean) as string[],
   credentials: true,
   methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
   allowedHeaders: ["Content-Type", "Authorization"],

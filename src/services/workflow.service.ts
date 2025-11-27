@@ -6,6 +6,7 @@ import logger from '../lib/logger';
 import { WorkflowExecutionContext, NodeExecutionResult, BaseNodeConfig } from "./workflow.types";
 import { WorkflowLogger } from "./workflow.logger";
 import * as executors from "./workflow.executors";
+import { CreateWorkflowInput } from '../routes/workflow.routes';
 
 export class WorkflowError extends Error {
   constructor(
@@ -21,11 +22,6 @@ const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 
-interface CreateWorkflowInput {
-  workspaceId: string;
-  name: string;
-  description?: string;
-}
 
 export async function createWorkflow(input: CreateWorkflowInput) {
   return prisma.workflow.create({

@@ -1,3 +1,5 @@
+export type CreateAgentInput = z.infer<typeof createAgentSchema>;
+
 import { Router } from "express";
 import { requireAuth, AuthRequest } from "../middleware/auth.middleware";
 import * as agentService from "../services/agent.service";
@@ -9,7 +11,7 @@ const router = Router();
 // All routes require authentication
 router.use(requireAuth);
 
-const createAgentSchema = z.object({
+export const createAgentSchema = z.object({
   workspaceId: z.string(),
   name: z.string().min(1).max(100),
   description: z.string().optional(),

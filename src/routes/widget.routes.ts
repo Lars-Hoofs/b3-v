@@ -1,3 +1,5 @@
+export type CreateWidgetInput = z.infer<typeof createWidgetSchema>;
+
 import { Router } from "express";
 import { requireAuth, AuthRequest } from "../middleware/auth.middleware";
 import * as widgetService from "../services/widget.service";
@@ -6,7 +8,7 @@ import { z } from "zod";
 
 const router = Router();
 
-const createWidgetSchema = z.object({
+export const createWidgetSchema = z.object({
   // Required
   workspaceId: z.string(),
   agentId: z.string(),

@@ -46,21 +46,6 @@ router.post('/scrape-website', requireAuth, async (req: AuthRequest, res) => {
     const { baseUrl, knowledgeBaseId, maxPages } = scrapeWebsiteSchema.parse(req.body);
     const userId = req.user?.id;
     
-    // Start scraping in background
-    res.json({
-      success: true,
-      message: 'Website scraping started',
-      status: 'Processing in background',
-    });
-    
-    // Process asynchronously with real-time updates
-    scraperService.scrapeEntireWebsite(baseUrl, knowledgeBaseId, maxPages, userId)
-      .then(results => {
-        logger.info('Website scraping completed', { baseUrl, pagesScraped: results.length });
-      })
-      .catch(error => {
-        logger.error('Website scraping error', { baseUrl, error: error.message });
-      });
     
   } catch (error: any) {
     if (error instanceof z.ZodError) {
