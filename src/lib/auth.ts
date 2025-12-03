@@ -48,8 +48,14 @@ export const auth = betterAuth({
     autoSignInAfterVerification: true,
     sendVerificationEmail: async ({ user, url, token }: { user: any; url: string; token: string }) => {
       try {
-        await sendVerificationEmail(user.email, url, token);
-        logger.info('Verification email sent', { email: user.email });
+        // Build a link to the frontend verify-email page so users land on the nice UI,
+        // and that page will in turn call the Better Auth backend.
+        const baseUrl = process.env.BETTER_AUTH_URL || "http://localhost:3000";
+        const trimmedBase = baseUrl.endsWith("/") ? baseUrl.slice(0, -1) : baseUrl;
+        const verifyUrl = `${trimmedBase}/verify-email?token=${encodeURIComponent(token)}`;
+
+        await sendVerificationEmail(user.email, verifyUrl, token);
+        logger.info('Verification email sent', { email: user.email, verifyUrl });
       } catch (error) {
         logger.error('Failed to send verification email', { email: user.email, error });
       }
