@@ -13,7 +13,7 @@ export const auth = betterAuth({
   }),
   emailAndPassword: {
     enabled: true,
-    requireEmailVerification: true,
+    requireEmailVerification: false,
     minPasswordLength: 12,
     maxPasswordLength: 128,
   },
@@ -36,7 +36,7 @@ export const auth = betterAuth({
     },
     changeEmail: {
       enabled: true,
-      requireEmailVerification: true,
+      requireEmailVerification: false,
     },
     changePassword: {
       enabled: true,
@@ -44,7 +44,7 @@ export const auth = betterAuth({
     },
   },
   emailVerification: {
-    sendOnSignUp: true,
+    sendOnSignUp: false,
     autoSignInAfterVerification: true,
     sendVerificationEmail: async ({ user, url, token }: { user: any; url: string; token: string }) => {
       try {

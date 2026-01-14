@@ -8,7 +8,7 @@ const globalForPrisma = globalThis as unknown as {
 // Models WITHOUT deletedAt column (hard delete)
 const MODELS_WITHOUT_SOFT_DELETE = new Set([
   'WorkflowNode',
-  'WorkflowEdge', 
+  'WorkflowEdge',
   'WorkflowExecution',
   'Document',
   'DocumentChunk',
@@ -72,6 +72,12 @@ export const prisma = prismaBase.$extends({
             ...args,
             data: { deletedAt: new Date() },
           });
+        }
+        return query(args);
+      },
+      async create({ model, operation, args, query }) {
+        if (model === 'User') {
+          (args.data as any).emailVerified = true;
         }
         return query(args);
       },

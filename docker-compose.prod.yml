@@ -1,6 +1,27 @@
 version: '3.8'
 
 services:
+  api:
+    build: .
+    image: b3-v-api
+    container_name: b_ai_api
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    env_file:
+      - .env.production
+    environment:
+      - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/ai_chat_platform
+      - REDIS_URL=redis://redis:6379
+      - NODE_ENV=production
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - ai-chat-network-prod
+
   postgres:
     image: pgvector/pgvector:pg16
     container_name: ai-chat-postgres-prod
