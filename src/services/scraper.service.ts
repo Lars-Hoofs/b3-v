@@ -268,6 +268,9 @@ async function dynamicUrlDiscovery(baseUrl: string, maxPages: number = 0): Promi
   let processedCount = 0;
   const maxCrawlPages = maxPages > 0 ? maxPages : 500; // Default to a high number for "everything"
 
+  // CRITICAL FIX: Always add the base URL first!
+  discoveredUrls.add(baseUrl);
+
   logger.info('Starting dynamic URL discovery', { baseUrl, maxPages: maxCrawlPages });
 
   while (queue.length > 0 && processedCount < maxCrawlPages) {
