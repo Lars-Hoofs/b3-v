@@ -21,22 +21,35 @@ const browserPool = {
     // OUD: if (!this.browser || this.browser.isDisconnected()) {
     // NIEUW:
     if (!this.browser || !this.browser.isConnected()) {
-      this.browser = await puppeteer.launch({
-        headless: true,
-        args: [
-          '--no-sandbox',
-          '--disable-setuid-sandbox',
-          '--disable-web-security',
-          '--disable-features=VizDisplayCompositor',
-          '--disable-background-timer-throttling',
-          '--disable-backgrounding-occluded-windows',
-          '--disable-renderer-backgrounding',
-          '--no-first-run',
-          '--disable-default-apps',
-          '--disable-extensions',
-          '--disable-plugins'
-        ]
+      logger.info('Launching browser', {
+        executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || 'default'
       });
+      try {
+        this.browser = await puppeteer.launch({
+          headless: true,
+          executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined,
+          args: [
+            '--no-sandbox',
+            '--disable-setuid-sandbox',
+            '--disable-web-security',
+            '--disable-features=VizDisplayCompositor',
+            '--disable-background-timer-throttling',
+            '--disable-backgrounding-occluded-windows',
+            '--disable-renderer-backgrounding',
+            '--no-first-run',
+            '--disable-default-apps',
+            '--disable-extensions',
+            '--disable-plugins'
+          ]
+        });
+        logger.info('Browser launched successfully');
+      } catch (error) {
+        logger.error('Failed to launch browser', {
+          error: error instanceof Error ? error.message : String(error),
+          stack: error instanceof Error ? error.stack : undefined
+        });
+        throw error;
+      }
     }
     return this.browser;
   },
@@ -392,7 +405,11 @@ export async function createScrapeJob(
       logger.info('Job URL discovery completed', { jobId: job.id, urlCount: discoveredUrls.length });
 
     } catch (error) {
-      logger.error('Failed to discover URLs for job', { jobId: job.id, error });
+      logger.error('Failed to discover URLs for job', {
+        jobId: job.id,
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined
+      });
       await prisma.scrapeJob.update({
         where: { id: job.id },
         data: {
