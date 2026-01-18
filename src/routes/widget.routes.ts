@@ -92,7 +92,7 @@ export const createWidgetSchema = z.object({
   showOnlineStatus: z.boolean().optional(),
   onlineStatusColor: z.string().regex(/^#[0-9A-Fa-f]{6}$/).optional(),
   avatarBackgroundColor: z.string().regex(/^#[0-9A-Fa-f]{6}$/).optional(),
-  headerAvatarUrl: z.string().url().optional().or(z.literal('')), // Custom avatar image URL
+  headerAvatarUrl: z.string().optional(), // Custom avatar image URL (any string, including empty)
   headerAvatarEmoji: z.string().max(10).optional(), // Custom emoji for avatar
 
   // Message Styling
