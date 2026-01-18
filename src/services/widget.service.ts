@@ -32,7 +32,7 @@ export async function createWidget(input: CreateWidgetInput) {
 
   // Extract all widget fields from input
   const { workspaceId, agentId, name, ...widgetConfig } = input;
-  
+
   const widget = await prisma.widget.create({
     data: {
       workspaceId,
@@ -44,7 +44,7 @@ export async function createWidget(input: CreateWidgetInput) {
       offsetY: widgetConfig.offsetY || 0,
       primaryColor: widgetConfig.primaryColor || "#6366f1",
       theme: widgetConfig.theme || "light",
-      
+
       // Bubble customization
       bubbleIcon: widgetConfig.bubbleIcon,
       bubbleText: widgetConfig.bubbleText,
@@ -54,38 +54,38 @@ export async function createWidget(input: CreateWidgetInput) {
       bubbleHeight: widgetConfig.bubbleHeight,
       bubbleBackgroundColor: widgetConfig.bubbleBackgroundColor || "#6366f1",
       bubbleTextColor: widgetConfig.bubbleTextColor || "#ffffff",
-      
+
       // Chat window
       chatWidth: widgetConfig.chatWidth || 400,
       chatHeight: widgetConfig.chatHeight || 600,
       chatBorderRadius: widgetConfig.chatBorderRadius || 16,
-      
+
       // Header
       headerTitle: widgetConfig.headerTitle,
       headerSubtitle: widgetConfig.headerSubtitle,
       headerBackgroundColor: widgetConfig.headerBackgroundColor || "#6366f1",
       headerTextColor: widgetConfig.headerTextColor || "#ffffff",
-      
+
       // Messages
       userMessageColor: widgetConfig.userMessageColor || "#6366f1",
       userMessageTextColor: widgetConfig.userMessageTextColor || "#ffffff",
       botMessageColor: widgetConfig.botMessageColor || "#f3f4f6",
       botMessageTextColor: widgetConfig.botMessageTextColor || "#111827",
       messageBorderRadius: widgetConfig.messageBorderRadius || 12,
-      
+
       // Behavior
       greeting: widgetConfig.greeting,
       placeholder: widgetConfig.placeholder || "Type your message...",
       suggestedQuestions: widgetConfig.suggestedQuestions || [],
       autoOpen: widgetConfig.autoOpen ?? false,
       autoOpenDelay: widgetConfig.autoOpenDelay || 5000,
-      
+
       // Branding & advanced
       showBranding: widgetConfig.showBranding ?? true,
       customCss: widgetConfig.customCss,
       allowedDomains: widgetConfig.allowedDomains || [],
       zIndex: widgetConfig.zIndex || 999999,
-      
+
       installCode,
     },
     include: {
@@ -201,7 +201,7 @@ export async function updateWidget(
 
   // Prepare update data
   const updateData: any = { ...data };
-  
+
   // If changing agent, verify new agent exists and use nested update
   if (data.agentId) {
     const agent = await prisma.agent.findFirst({
@@ -215,14 +215,14 @@ export async function updateWidget(
     if (!agent) {
       throw new WidgetError("Agent not found in this workspace", 404);
     }
-    
+
     // Convert agentId to nested relation update
     updateData.agent = {
       connect: { id: data.agentId }
     };
     delete updateData.agentId;
   }
-  
+
   // Remove workspaceId from update data if present
   delete updateData.workspaceId;
 
@@ -795,10 +795,23 @@ export function generateWidgetScript(): string {
       hoverStyle.textContent = css;
       document.head.appendChild(hoverStyle);
     }
+    // Avatar - support custom image, emoji, or fallback
+    let avatarContent = '👤'; // Default emoji
+    if (cfg.headerAvatarUrl) {
+      avatarContent = '<img src="' + cfg.headerAvatarUrl + '" alt="Avatar" style="width: 100%; height: 100%; object-fit: cover;" />';
+    } else if (cfg.headerAvatarEmoji) {
+      avatarContent = cfg.headerAvatarEmoji;
+    }
+    
+    // Configurable colors with sensible defaults
+    const chatBgColor = cfg.chatBackgroundColor || '#f9fafb';
+    const inputAreaBgColor = cfg.inputAreaBackgroundColor || '#ffffff';
+    const inputAreaBorderColor = cfg.inputAreaBorderColor || '#f3f4f6';
+    const typingColor = cfg.typingIndicatorColor || '#6b7280';
     
     return '<div style=\"background: ' + cfg.headerBackgroundColor + '; color: ' + cfg.headerTextColor + '; padding: 20px; display: flex; align-items: center; justify-content: space-between;\">' +
       '<div style=\"display: flex; align-items: center; gap: 16px;\">' +
-        (cfg.showAgentAvatar ? '<div style=\"width: 44px; height: 44px; border-radius: 50%; background: ' + avatarBg + '; display: flex; align-items: center; justify-content: center; overflow: hidden; backdrop-filter: blur(4px); box-shadow: 0 2px 8px rgba(0,0,0,0.1);\">👤</div>' : '') +
+        (cfg.showAgentAvatar ? '<div style=\"width: 44px; height: 44px; border-radius: 50%; background: ' + avatarBg + '; display: flex; align-items: center; justify-content: center; overflow: hidden; backdrop-filter: blur(4px); box-shadow: 0 2px 8px rgba(0,0,0,0.1);\">' + avatarContent + '</div>' : '') +
         '<div>' +
           '<div style=\"font-weight: 700; font-size: 18px; letter-spacing: -0.02em;\">' + (cfg.headerTitle || 'Chat Support') + '</div>' +
           (cfg.headerSubtitle ? '<div style=\"font-size: 13px; opacity: 0.9; margin-top: 2px;\">' + cfg.headerSubtitle + '</div>' : '') +
@@ -809,9 +822,9 @@ export function generateWidgetScript(): string {
         closeIconHtml +
       '</button>' +
     '</div>' +
-    '<div id=\"ai-chat-messages\" style=\"flex: 1; overflow-y: auto; padding: 20px; display: flex; flex-direction: column; gap: 16px; background: #f9fafb;\"></div>' +
-    '<div style=\"padding: 20px; border-top: 1px solid #f3f4f6; background: white;\">' +
-      '<div id=\"ai-chat-typing\" style=\"display: none; color: #6b7280; font-size: 12px; margin-bottom: 12px; padding-left: 4px;\">AI is typing...</div>' +
+    '<div id=\"ai-chat-messages\" style=\"flex: 1; overflow-y: auto; padding: 20px; display: flex; flex-direction: column; gap: 16px; background: ' + chatBgColor + ';\"></div>' +
+    '<div style=\"padding: 20px; border-top: 1px solid ' + inputAreaBorderColor + '; background: ' + inputAreaBgColor + ';\">' +
+      '<div id=\"ai-chat-typing\" style=\"display: none; color: ' + typingColor + '; font-size: 12px; margin-bottom: 12px; padding-left: 4px;\">AI is typing...</div>' +
       '<div style=\"display: flex; gap: 12px; align-items: flex-end;\">' +
         '<input id=\"ai-chat-input\" type=\"text\" placeholder=\"' + cfg.placeholder + '\" style=\"flex: 1; padding: 12px 16px; border: 1px solid ' + inputBorderColor + '; border-radius: 12px; font-size: 15px; outline: none; transition: border-color 0.2s, box-shadow 0.2s; background: ' + inputBgColor + '; color: ' + inputTextColor + ';\" onfocus=\"this.style.borderColor=\\'' + inputFocusBorderColor + '\\'; this.style.boxShadow=\\'0 0 0 3px rgba(99, 102, 241, 0.1)\\';\" onblur=\"this.style.borderColor=\\'' + inputBorderColor + '\\'; this.style.boxShadow=\\'none\\';\" />' +
         '<button id=\"ai-chat-send\" style=\"background: ' + sendBtnBg + '; color: ' + sendBtnIconColor + '; border: none; padding: 0; width: 46px; height: 46px; border-radius: 12px; font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0; transition: transform 0.1s, background 0.2s, color 0.2s; box-shadow: 0 4px 12px rgba(0,0,0,0.1);\" onmousedown=\"this.style.transform=\\'scale(0.95)\\'\" onmouseup=\"this.style.transform=\\'scale(1)\\'\">' +
@@ -819,7 +832,7 @@ export function generateWidgetScript(): string {
         '</button>' +
       '</div>' +
     '</div>' +
-    (cfg.showBranding ? '<div style=\"padding: 8px; text-align: center; font-size: 11px; color: #9ca3af; background: #f9fafb; border-top: 1px solid #f3f4f6;\">' + cfg.brandingText + '</div>' : '');
+    (cfg.showBranding ? '<div style=\"padding: 8px; text-align: center; font-size: 11px; color: #9ca3af; background: ' + chatBgColor + '; border-top: 1px solid ' + inputAreaBorderColor + ';\"><a href=\"' + (cfg.brandingUrl || 'https://bonsaimedia.nl') + '\" target=\"_blank\" style=\"color: inherit; text-decoration: none;\">' + (cfg.brandingText || 'Powered by BonsaiMedia.nl') + '</a></div>' : '');
   }
   
   function getAnimation(type) {

@@ -410,6 +410,8 @@ model Widget {
   showOnlineStatus Boolean @default(true)
   onlineStatusColor String @default("#22c55e") // Green dot color
   avatarBackgroundColor String? // Avatar background color
+  headerAvatarUrl String? // Custom avatar image URL (replaces emoji)
+  headerAvatarEmoji String? // Custom emoji for avatar (default: 👤)
   
   // Message Styling
   userMessageColor String @default("#6366f1")
@@ -418,6 +420,7 @@ model Widget {
   botMessageTextColor String @default("#111827") // Text color in bot messages
   messageBorderRadius Int @default(12)
   borderColor     String? // Custom border color
+  chatBackgroundColor String @default("#f9fafb") // Messages area background
   
   // Input Styling
   inputBorderColor String @default("#e5e7eb") // Input border color
@@ -425,6 +428,9 @@ model Widget {
   inputBackgroundColor String @default("#ffffff") // Input background
   inputTextColor String @default("#1f2937") // Input text color
   inputPlaceholderColor String? // Placeholder text color
+  inputAreaBackgroundColor String @default("#ffffff") // Entire input area background
+  inputAreaBorderColor String @default("#f3f4f6") // Border above input area
+  typingIndicatorColor String @default("#6b7280") // "AI is typing..." text color
   
   // Send Button Styling
   sendButtonIcon String? // Custom send icon (Remixicon name)
