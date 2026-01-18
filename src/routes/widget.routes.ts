@@ -13,7 +13,7 @@ export const createWidgetSchema = z.object({
   workspaceId: z.string(),
   agentId: z.string(),
   name: z.string().min(1).max(100),
-  
+
   // Widget Type & Position
   widgetType: z.enum(["bubble", "searchbar", "custom-box"]).optional(),
   position: z.enum(["bottom-right", "bottom-left", "top-right", "top-left", "top-center", "bottom-center", "middle-left", "middle-center", "middle-right"]).optional(),
@@ -21,7 +21,7 @@ export const createWidgetSchema = z.object({
   offsetY: z.number().int().min(-500).max(500).optional(),
   primaryColor: z.string().regex(/^#[0-9A-Fa-f]{6}$/).optional(),
   theme: z.enum(["light", "dark", "auto"]).optional(),
-  
+
   // Advanced Layout
   layoutMode: z.enum(["fixed", "percentage", "full-height", "full-width", "custom"]).optional(),
   widthPercentage: z.number().int().min(10).max(100).optional(),
@@ -30,7 +30,7 @@ export const createWidgetSchema = z.object({
   maxHeight: z.number().int().min(100).max(5000).optional(),
   minWidth: z.number().int().min(100).max(5000).optional(),
   minHeight: z.number().int().min(100).max(5000).optional(),
-  
+
   // Bubble Customization
   bubbleShape: z.enum(["circle", "square", "rounded-square"]).optional(),
   bubbleSize: z.enum(["small", "medium", "large", "custom"]).optional(),
@@ -45,13 +45,13 @@ export const createWidgetSchema = z.object({
   bubbleShadow: z.string().optional(),
   bubbleImageUrl: z.string().url().optional(),
   bubbleImageFit: z.enum(["cover", "contain", "fill"]).optional(),
-  
+
   // Bubble Hover State
   bubbleHoverBackgroundColor: z.string().regex(/^#[0-9A-Fa-f]{6}$/).optional(),
   bubbleHoverTextColor: z.string().regex(/^#[0-9A-Fa-f]{6}$/).optional(),
   bubbleHoverIconColor: z.string().regex(/^#[0-9A-Fa-f]{6}$/).optional(),
   bubbleHoverScale: z.number().min(0.8).max(1.5).optional(),
-  
+
   // Animation System
   enableAnimation: z.boolean().optional(),
   animationType: z.enum(["slide", "fade", "scale", "bounce", "flip"]).optional(),
@@ -59,17 +59,17 @@ export const createWidgetSchema = z.object({
   animationDuration: z.number().int().min(100).max(2000).optional(),
   animationDelay: z.number().int().min(0).max(5000).optional(),
   hoverAnimation: z.enum(["none", "lift", "grow", "pulse", "rotate"]).optional(),
-  
+
   // Icon/Image Relationship
   imageIconRelation: z.enum(["cover", "overlay", "grow-from", "side-by-side"]).optional(),
   imagePosition: z.enum(["top", "bottom", "left", "right", "background"]).optional(),
   imageFullHeight: z.boolean().optional(),
-  
+
   // Legacy Animation (keep for backwards compatibility)
   bubbleAnimation: z.enum(["bounce", "pulse", "shake", "none"]).optional(),
   bubbleAnimationDelay: z.number().int().min(0).max(30000).optional(),
   openAnimation: z.enum(["slide-up", "fade", "scale", "none"]).optional(),
-  
+
   // Chat Window
   chatWidth: z.number().int().min(300).max(800).optional(),
   chatHeight: z.number().int().min(400).max(900).optional(),
@@ -77,7 +77,7 @@ export const createWidgetSchema = z.object({
   chatAnimation: z.enum(["none", "slide-up", "slide-down", "fade", "scale"]).optional(),
   chatOffsetX: z.number().int().min(-500).max(500).optional(),
   chatOffsetY: z.number().int().min(-500).max(500).optional(),
-  
+
   // Header
   headerTitle: z.string().max(100).optional(),
   headerSubtitle: z.string().max(200).optional(),
@@ -92,7 +92,7 @@ export const createWidgetSchema = z.object({
   showOnlineStatus: z.boolean().optional(),
   onlineStatusColor: z.string().regex(/^#[0-9A-Fa-f]{6}$/).optional(),
   avatarBackgroundColor: z.string().regex(/^#[0-9A-Fa-f]{6}$/).optional(),
-  
+
   // Message Styling
   userMessageColor: z.string().regex(/^#[0-9A-Fa-f]{6}$/).optional(),
   userMessageTextColor: z.string().regex(/^#[0-9A-Fa-f]{6}$/).optional(),
@@ -100,21 +100,21 @@ export const createWidgetSchema = z.object({
   botMessageTextColor: z.string().regex(/^#[0-9A-Fa-f]{6}$/).optional(),
   messageBorderRadius: z.number().int().min(0).max(50).optional(),
   borderColor: z.string().regex(/^#[0-9A-Fa-f]{6}$/).optional(),
-  
+
   // Input Styling
   inputBorderColor: z.string().regex(/^#[0-9A-Fa-f]{6}$/).optional(),
   inputFocusBorderColor: z.string().regex(/^#[0-9A-Fa-f]{6}$/).optional(),
   inputBackgroundColor: z.string().regex(/^#[0-9A-Fa-f]{6}$/).optional(),
   inputTextColor: z.string().regex(/^#[0-9A-Fa-f]{6}$/).optional(),
   inputPlaceholderColor: z.string().regex(/^#[0-9A-Fa-f]{6}$/).optional(),
-  
+
   // Send Button Styling
   sendButtonIcon: z.string().optional(),
   sendButtonBackgroundColor: z.string().regex(/^#[0-9A-Fa-f]{6}$/).optional(),
   sendButtonIconColor: z.string().regex(/^#[0-9A-Fa-f]{6}$/).optional(),
   sendButtonHoverBackgroundColor: z.string().regex(/^#[0-9A-Fa-f]{6}$/).optional(),
   sendButtonHoverIconColor: z.string().regex(/^#[0-9A-Fa-f]{6}$/).optional(),
-  
+
   // Advanced Styling
   backgroundGradient: z.object({
     from: z.string().regex(/^#[0-9A-Fa-f]{6}$/),
@@ -125,7 +125,7 @@ export const createWidgetSchema = z.object({
   borderWidth: z.number().int().min(0).max(10).optional(),
   shadowIntensity: z.enum(["none", "sm", "md", "lg", "xl"]).optional(),
   glassEffect: z.boolean().optional(),
-  
+
   // Behavior
   greeting: z.string().max(500).optional(),
   placeholder: z.string().max(100).optional(),
@@ -133,7 +133,7 @@ export const createWidgetSchema = z.object({
   autoOpen: z.boolean().optional(),
   autoOpenDelay: z.number().int().min(0).max(60000).optional(),
   soundEnabled: z.boolean().optional(),
-  
+
   // AI-Only Mode & Availability
   aiOnlyMode: z.boolean().optional(),
   aiOnlyMessage: z.record(z.string()).optional(), // { en: "...", nl: "..." }
@@ -147,12 +147,12 @@ export const createWidgetSchema = z.object({
     name: z.string().max(100),
     recurring: z.boolean().optional(),
   })).optional(),
-  
+
   // Branding
   showBranding: z.boolean().optional(),
   brandingText: z.string().max(100).optional(),
   brandingUrl: z.string().url().optional(),
-  
+
   // Advanced
   customCss: z.string().max(10000).optional(),
   customJs: z.string().max(10000).optional(),
@@ -165,11 +165,11 @@ router.post("/", requireAuth, async (req: AuthRequest, res) => {
   try {
     const data = createWidgetSchema.parse(req.body);
     const widget = await widgetService.createWidget(data);
-    
+
     // Generate embed code
     const apiUrl = process.env.BETTER_AUTH_URL || "http://localhost:3000";
     const embedCode = widgetService.generateEmbedCode(widget.installCode, apiUrl);
-    
+
     res.status(201).json({ ...widget, embedCode });
   } catch (error: any) {
     if (error instanceof z.ZodError) {
@@ -202,11 +202,11 @@ router.get("/:id", requireAuth, async (req: AuthRequest, res) => {
       return res.status(400).json({ error: "workspaceId query parameter required" });
     }
     const widget = await widgetService.getWidget(req.params.id, workspaceId);
-    
+
     // Generate embed code
     const apiUrl = process.env.BETTER_AUTH_URL || "http://localhost:3000";
     const embedCode = widgetService.generateEmbedCode(widget.installCode, apiUrl);
-    
+
     res.json({ ...widget, embedCode });
   } catch (error) {
     if (error instanceof WidgetError) {
@@ -271,11 +271,25 @@ router.post("/:id/toggle", requireAuth, async (req: AuthRequest, res) => {
   }
 });
 
+// OPTIONS handler for CORS preflight (PUBLIC widget config)
+router.options("/config/:installCode", (req, res) => {
+  res.setHeader("Access-Control-Allow-Origin", "*");
+  res.setHeader("Access-Control-Allow-Methods", "GET, OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+  res.status(204).send();
+});
+
 // Get widget config by install code (PUBLIC - for embedded widget)
 router.get("/config/:installCode", async (req, res) => {
   try {
+    // CORS headers to allow widget to load from ANY website (including file://)
+    res.setHeader("Access-Control-Allow-Origin", "*");
+    res.setHeader("Access-Control-Allow-Methods", "GET, OPTIONS");
+    res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+    res.setHeader("Cross-Origin-Resource-Policy", "cross-origin");
+
     const widget = await widgetService.getWidgetByInstallCode(req.params.installCode);
-    
+
     // Return full widget configuration for rendering
     res.json({
       id: widget.id, // CRITICAL: Widget ID needed for conversation creation
@@ -286,7 +300,7 @@ router.get("/config/:installCode", async (req, res) => {
       offsetY: widget.offsetY,
       primaryColor: widget.primaryColor,
       theme: widget.theme,
-      
+
       // Advanced Layout
       layoutMode: widget.layoutMode,
       widthPercentage: widget.widthPercentage,
@@ -295,7 +309,7 @@ router.get("/config/:installCode", async (req, res) => {
       maxHeight: widget.maxHeight,
       minWidth: widget.minWidth,
       minHeight: widget.minHeight,
-      
+
       // Bubble customization
       bubbleShape: widget.bubbleShape,
       bubbleSize: widget.bubbleSize,
@@ -310,13 +324,13 @@ router.get("/config/:installCode", async (req, res) => {
       bubbleShadow: widget.bubbleShadow,
       bubbleImageUrl: widget.bubbleImageUrl,
       bubbleImageFit: widget.bubbleImageFit,
-      
+
       // Bubble Hover
       bubbleHoverBackgroundColor: widget.bubbleHoverBackgroundColor,
       bubbleHoverTextColor: widget.bubbleHoverTextColor,
       bubbleHoverIconColor: widget.bubbleHoverIconColor,
       bubbleHoverScale: widget.bubbleHoverScale,
-      
+
       // Animation System
       enableAnimation: widget.enableAnimation,
       animationType: widget.animationType,
@@ -324,17 +338,17 @@ router.get("/config/:installCode", async (req, res) => {
       animationDuration: widget.animationDuration,
       animationDelay: widget.animationDelay,
       hoverAnimation: widget.hoverAnimation,
-      
+
       // Icon/Image Relationship
       imageIconRelation: widget.imageIconRelation,
       imagePosition: widget.imagePosition,
       imageFullHeight: widget.imageFullHeight,
-      
+
       // Legacy Animation
       bubbleAnimation: widget.bubbleAnimation,
       bubbleAnimationDelay: widget.bubbleAnimationDelay,
       openAnimation: widget.openAnimation,
-      
+
       // Chat window
       chatWidth: widget.chatWidth,
       chatHeight: widget.chatHeight,
@@ -342,7 +356,7 @@ router.get("/config/:installCode", async (req, res) => {
       chatAnimation: widget.chatAnimation,
       chatOffsetX: widget.chatOffsetX,
       chatOffsetY: widget.chatOffsetY,
-      
+
       // Advanced Styling
       backgroundGradient: widget.backgroundGradient,
       backdropBlur: widget.backdropBlur,
@@ -350,7 +364,7 @@ router.get("/config/:installCode", async (req, res) => {
       borderColor: widget.borderColor,
       shadowIntensity: widget.shadowIntensity,
       glassEffect: widget.glassEffect,
-      
+
       // Header
       headerTitle: widget.headerTitle || widget.agent.name,
       headerSubtitle: widget.headerSubtitle,
@@ -365,28 +379,28 @@ router.get("/config/:installCode", async (req, res) => {
       showOnlineStatus: widget.showOnlineStatus,
       onlineStatusColor: widget.onlineStatusColor,
       avatarBackgroundColor: widget.avatarBackgroundColor,
-      
+
       // Messages
       userMessageColor: widget.userMessageColor,
       userMessageTextColor: widget.userMessageTextColor,
       botMessageColor: widget.botMessageColor,
       botMessageTextColor: widget.botMessageTextColor,
       messageBorderRadius: widget.messageBorderRadius,
-      
+
       // Input
       inputBorderColor: widget.inputBorderColor,
       inputFocusBorderColor: widget.inputFocusBorderColor,
       inputBackgroundColor: widget.inputBackgroundColor,
       inputTextColor: widget.inputTextColor,
       inputPlaceholderColor: widget.inputPlaceholderColor,
-      
+
       // Send Button
       sendButtonIcon: widget.sendButtonIcon,
       sendButtonBackgroundColor: widget.sendButtonBackgroundColor,
       sendButtonIconColor: widget.sendButtonIconColor,
       sendButtonHoverBackgroundColor: widget.sendButtonHoverBackgroundColor,
       sendButtonHoverIconColor: widget.sendButtonHoverIconColor,
-      
+
       // Behavior
       greeting: widget.greeting,
       placeholder: widget.placeholder,
@@ -394,23 +408,23 @@ router.get("/config/:installCode", async (req, res) => {
       autoOpen: widget.autoOpen,
       autoOpenDelay: widget.autoOpenDelay,
       soundEnabled: widget.soundEnabled,
-      
+
       // AI-Only Mode & Availability
       aiOnlyMode: widget.aiOnlyMode,
       aiOnlyMessage: widget.aiOnlyMessage,
       workingHours: widget.workingHours,
       holidays: widget.holidays,
-      
+
       // Branding
       showBranding: widget.showBranding,
       brandingText: widget.brandingText,
       brandingUrl: widget.brandingUrl,
-      
+
       // Advanced
       customCss: widget.customCss,
       customJs: widget.customJs,
       zIndex: widget.zIndex,
-      
+
       agent: {
         id: widget.agent.id,
         name: widget.agent.name,
@@ -433,9 +447,9 @@ router.get("/preview/:id", requireAuth, async (req: AuthRequest, res) => {
     if (!workspaceId || typeof workspaceId !== "string") {
       return res.status(400).json({ error: "workspaceId query parameter required" });
     }
-    
+
     const widget = await widgetService.getWidget(req.params.id, workspaceId);
-    
+
     // Generate preview HTML
     const html = `<!DOCTYPE html>
 <html>
@@ -495,7 +509,7 @@ router.get("/preview/:id", requireAuth, async (req: AuthRequest, res) => {
   <script src="/widget.js"></script>
 </body>
 </html>`;
-    
+
     res.setHeader("Content-Type", "text/html");
     res.send(html);
   } catch (error) {

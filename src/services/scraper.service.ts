@@ -273,18 +273,19 @@ export async function scrapeWebsite(
  * @param maxPages The maximum number of unique pages to discover.
  * @returns A set of discovered URLs.
  */
-async function dynamicUrlDiscovery(baseUrl: string, maxPages: number = 0): Promise<string[]> {
+async function dynamicUrlDiscovery(baseUrl: string, maxPages: number = 0, jobId?: string): Promise<string[]> {
   const discoveredUrls = new Set<string>();
   const visitedUrls = new Set<string>();
   const queue = [baseUrl];
   const domain = new URL(baseUrl).hostname;
   let processedCount = 0;
   const maxCrawlPages = maxPages > 0 ? maxPages : 500; // Default to a high number for "everything"
+  let lastUpdateCount = 0; // Track when we last updated the job
 
   // CRITICAL FIX: Always add the base URL first!
   discoveredUrls.add(baseUrl);
 
-  logger.info('Starting dynamic URL discovery', { baseUrl, maxPages: maxCrawlPages });
+  logger.info('Starting dynamic URL discovery', { baseUrl, maxPages: maxCrawlPages, jobId });
 
   while (queue.length > 0 && processedCount < maxCrawlPages) {
     const currentUrl = queue.shift()!;
@@ -300,6 +301,23 @@ async function dynamicUrlDiscovery(baseUrl: string, maxPages: number = 0): Promi
         discovered: discoveredUrls.size,
         queueSize: queue.length
       });
+    }
+
+    // Update job in database every 10 newly discovered URLs for real-time progress
+    if (jobId && discoveredUrls.size - lastUpdateCount >= 10) {
+      try {
+        await prisma.scrapeJob.update({
+          where: { id: jobId },
+          data: {
+            discoveredUrls: Array.from(discoveredUrls),
+            totalUrls: discoveredUrls.size,
+          }
+        });
+        lastUpdateCount = discoveredUrls.size;
+        logger.info('Job progress updated', { jobId, discovered: discoveredUrls.size });
+      } catch (error) {
+        logger.warn('Failed to update job progress', { jobId, error });
+      }
     }
 
     let page = null;
@@ -402,7 +420,7 @@ export async function createScrapeJob(
     try {
       logger.info('Starting URL discovery for job', { jobId: job.id, baseUrl });
 
-      const discoveredUrls = await dynamicUrlDiscovery(baseUrl, maxPages);
+      const discoveredUrls = await dynamicUrlDiscovery(baseUrl, maxPages, job.id);
 
       logger.info('URL discovery successful, updating job', {
         jobId: job.id,

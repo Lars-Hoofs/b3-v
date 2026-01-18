@@ -8,7 +8,7 @@ import { createServer } from "http";
 dotenv.config();
 
 // Then validate environment (this imports './lib/env' which validates)
-import './lib/env'; 
+import './lib/env';
 import logger from './lib/logger';
 import { requestLogger } from './middleware/requestLogger';
 import { authLimiter, apiLimiter, scrapingLimiter, singlePageScrapeLimiter } from './middleware/rateLimits';
@@ -91,12 +91,12 @@ let isShuttingDown = false;
 // Health check endpoint
 app.get("/health", (req: Request, res: Response) => {
   if (isShuttingDown) {
-    return res.status(503).json({ 
+    return res.status(503).json({
       status: 'shutting_down',
       timestamp: new Date().toISOString(),
     });
   }
-  
+
   res.json({
     status: "healthy",
     timestamp: new Date().toISOString(),
@@ -110,27 +110,27 @@ app.all("/api/auth/*", authLimiter, async (req, res) => {
     const protocol = req.protocol || 'http';
     const host = req.get('host') || `localhost:${PORT}`;
     const fullUrl = `${protocol}://${host}${req.url}`;
-    
+
     const headers = new Headers();
     Object.entries(req.headers).forEach(([key, value]) => {
       if (value) {
         headers.set(key, Array.isArray(value) ? value[0] : value);
       }
     });
-    
+
     const webRequest = new globalThis.Request(fullUrl, {
       method: req.method,
       headers: headers,
       body: req.method !== 'GET' && req.method !== 'HEAD' ? JSON.stringify(req.body) : undefined,
     });
-    
+
     const response = await auth.handler(webRequest);
-    
+
     res.status(response.status);
     response.headers.forEach((value, key) => {
       res.setHeader(key, value);
     });
-    
+
     const body = await response.text();
     res.send(body);
   } catch (error: any) {
@@ -147,6 +147,22 @@ app.get("/widget.js", (req, res) => {
   res.setHeader("Cross-Origin-Resource-Policy", "cross-origin");
   res.setHeader("Content-Type", "application/javascript");
   res.send(generateWidgetScript());
+});
+
+// CORS middleware for PUBLIC widget and chat endpoints
+// These need to work from ANY website (including file://)
+app.use(["/api/widgets/config", "/api/chat/conversations", "/api/chat/messages"], (req, res, next) => {
+  res.setHeader("Access-Control-Allow-Origin", "*");
+  res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
+  res.setHeader("Cross-Origin-Resource-Policy", "cross-origin");
+
+  // Handle OPTIONS preflight
+  if (req.method === "OPTIONS") {
+    return res.status(204).send();
+  }
+
+  next();
 });
 
 // API routes - BASIC ONLY FOR NOW
