@@ -18,10 +18,10 @@ export const auth = betterAuth({
     maxPasswordLength: 128,
   },
   session: {
-    expiresIn: 60 * 60 * 24 * 7, 
-    updateAge: 60 * 60 * 24, 
+    expiresIn: 60 * 60 * 24 * 7,
+    updateAge: 60 * 60 * 24,
     cookieCache: {
-      enabled: false, 
+      enabled: false,
     },
   },
   account: {
@@ -44,6 +44,7 @@ export const auth = betterAuth({
     },
   },
   emailVerification: {
+<<<<<<< HEAD
     sendOnSignUp: false,
     autoSignInAfterVerification: true,
     sendVerificationEmail: async ({ user, url, token }: { user: any; url: string; token: string }) => {
@@ -52,12 +53,28 @@ export const auth = betterAuth({
         logger.info('Verification email sent', { email: user.email });
       } catch (error) {
         logger.error('Failed to send verification email', { email: user.email, error });
+=======
+    sendOnSignUp: true,
+    autoSignInAfterVerification: true,
+    sendVerificationEmail: async ({ user, url, token }) => {
+      try {
+        // url = https://ai.bonsaimedia.nl/api/auth/verify-email?token=...
+        // MAAR: we bouwen zelf onze eigen frontend-link:
+        const baseUrl = process.env.BETTER_AUTH_URL || "http://localhost:3000";
+        const trimmedBase = baseUrl.endsWith("/") ? baseUrl.slice(0, -1) : baseUrl;
+        const verifyUrl = `${trimmedBase}/verify-email?token=${encodeURIComponent(token)}`;
+
+        await sendVerificationEmail(user.email, verifyUrl, token);
+        logger.info("Verification email sent", { email: user.email, verifyUrl });
+      } catch (error) {
+        logger.error("Failed to send verification email", { email: user.email, error });
+>>>>>>> 1c4ef97 (Fix web scraper: add Puppeteer/Chromium support for production)
       }
     },
   },
   passwordReset: {
     enabled: true,
-    expiresIn: 60 * 60, 
+    expiresIn: 60 * 60,
     sendResetEmail: async ({ user, url, token }: { user: any; url: string; token: string }) => {
       try {
         await sendPasswordResetEmail(user.email, url, token);
@@ -71,8 +88,13 @@ export const auth = betterAuth({
     process.env.BETTER_AUTH_URL || "http://localhost:3000",
     "http://localhost:3000",
     "http://127.0.0.1:3000",
+<<<<<<< HEAD
     "http://localhost:3001", 
     "https://ai.bonsaimedia.nl", // Frontend URL
+=======
+    "http://localhost:3001",
+    "https://ai.bonsaimedia.nl",  // ✅ Frontend URL toegevoegd
+>>>>>>> 1c4ef97 (Fix web scraper: add Puppeteer/Chromium support for production)
   ],
   advanced: {
     generateId: () => {
@@ -80,27 +102,28 @@ export const auth = betterAuth({
     },
     cookiePrefix: "enterprise",
     crossSubDomainCookies: {
-      enabled: false,
+      enabled: true,  // ✅ Enable voor ai.bonsaimedia.nl ↔ api.bonsaimedia.nl
     },
     useSecureCookies: process.env.NODE_ENV === "production",
-    disableCSRFCheck: process.env.NODE_ENV === "development", 
+    disableCSRFCheck: process.env.NODE_ENV === "development",
   },
   cookies: {
     sessionToken: {
       name: "enterprise.session_token",
       options: {
         httpOnly: true,
-        sameSite: process.env.NODE_ENV === "production" ? "strict" : "lax",
+        sameSite: "lax",  // ✅ 'lax' werkt voor cross-subdomain (strict niet)
         secure: process.env.NODE_ENV === "production",
+        domain: process.env.NODE_ENV === "production" ? ".bonsaimedia.nl" : undefined,  // ✅ Parent domain voor ai + api
         path: "/",
       },
     },
   },
   rateLimit: {
     enabled: process.env.NODE_ENV === "production",
-    window: 60, 
-    max: 100, 
-    storage: "memory", 
+    window: 60,
+    max: 100,
+    storage: "memory",
   },
   plugins: [
     twoFactor({
@@ -108,14 +131,14 @@ export const auth = betterAuth({
     }),
     admin({
       defaultRole: "user",
-      impersonationSessionDuration: 60 * 60, 
+      impersonationSessionDuration: 60 * 60,
     }),
     multiSession({
-      maximumSessions: 10, 
+      maximumSessions: 10,
     }),
     organization({
       allowUserToCreateOrganization: true,
-      organizationLimit: 5, 
+      organizationLimit: 5,
     }),
   ],
 });
