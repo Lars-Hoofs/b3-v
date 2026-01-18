@@ -92,6 +92,8 @@ export const createWidgetSchema = z.object({
   showOnlineStatus: z.boolean().optional(),
   onlineStatusColor: z.string().regex(/^#[0-9A-Fa-f]{6}$/).optional(),
   avatarBackgroundColor: z.string().regex(/^#[0-9A-Fa-f]{6}$/).optional(),
+  headerAvatarUrl: z.string().url().optional().or(z.literal('')), // Custom avatar image URL
+  headerAvatarEmoji: z.string().max(10).optional(), // Custom emoji for avatar
 
   // Message Styling
   userMessageColor: z.string().regex(/^#[0-9A-Fa-f]{6}$/).optional(),
@@ -100,6 +102,7 @@ export const createWidgetSchema = z.object({
   botMessageTextColor: z.string().regex(/^#[0-9A-Fa-f]{6}$/).optional(),
   messageBorderRadius: z.number().int().min(0).max(50).optional(),
   borderColor: z.string().regex(/^#[0-9A-Fa-f]{6}$/).optional(),
+  chatBackgroundColor: z.string().regex(/^#[0-9A-Fa-f]{6}$/).optional(), // Chat messages area background
 
   // Input Styling
   inputBorderColor: z.string().regex(/^#[0-9A-Fa-f]{6}$/).optional(),
@@ -107,6 +110,9 @@ export const createWidgetSchema = z.object({
   inputBackgroundColor: z.string().regex(/^#[0-9A-Fa-f]{6}$/).optional(),
   inputTextColor: z.string().regex(/^#[0-9A-Fa-f]{6}$/).optional(),
   inputPlaceholderColor: z.string().regex(/^#[0-9A-Fa-f]{6}$/).optional(),
+  inputAreaBackgroundColor: z.string().regex(/^#[0-9A-Fa-f]{6}$/).optional(), // Input area background
+  inputAreaBorderColor: z.string().regex(/^#[0-9A-Fa-f]{6}$/).optional(), // Input area border
+  typingIndicatorColor: z.string().regex(/^#[0-9A-Fa-f]{6}$/).optional(), // "AI is typing..." color
 
   // Send Button Styling
   sendButtonIcon: z.string().optional(),
