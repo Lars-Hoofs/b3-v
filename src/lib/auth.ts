@@ -44,16 +44,6 @@ export const auth = betterAuth({
     },
   },
   emailVerification: {
-<<<<<<< HEAD
-    sendOnSignUp: false,
-    autoSignInAfterVerification: true,
-    sendVerificationEmail: async ({ user, url, token }: { user: any; url: string; token: string }) => {
-      try {
-        await sendVerificationEmail(user.email, url, token);
-        logger.info('Verification email sent', { email: user.email });
-      } catch (error) {
-        logger.error('Failed to send verification email', { email: user.email, error });
-=======
     sendOnSignUp: true,
     autoSignInAfterVerification: true,
     sendVerificationEmail: async ({ user, url, token }) => {
@@ -68,7 +58,6 @@ export const auth = betterAuth({
         logger.info("Verification email sent", { email: user.email, verifyUrl });
       } catch (error) {
         logger.error("Failed to send verification email", { email: user.email, error });
->>>>>>> 1c4ef97 (Fix web scraper: add Puppeteer/Chromium support for production)
       }
     },
   },
@@ -88,13 +77,8 @@ export const auth = betterAuth({
     process.env.BETTER_AUTH_URL || "http://localhost:3000",
     "http://localhost:3000",
     "http://127.0.0.1:3000",
-<<<<<<< HEAD
-    "http://localhost:3001", 
-    "https://ai.bonsaimedia.nl", // Frontend URL
-=======
     "http://localhost:3001",
     "https://ai.bonsaimedia.nl",  // ✅ Frontend URL toegevoegd
->>>>>>> 1c4ef97 (Fix web scraper: add Puppeteer/Chromium support for production)
   ],
   advanced: {
     generateId: () => {
