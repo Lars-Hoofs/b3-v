@@ -111,6 +111,36 @@ export async function deleteKnowledgeBase(kbId: string, workspaceId: string) {
   return { success: true };
 }
 
+export async function getKnowledgeBaseDocuments(kbId: string) {
+  const documents = await prisma.document.findMany({
+    where: {
+      knowledgeBaseId: kbId,
+    },
+    select: {
+      id: true,
+      title: true,
+      content: true,
+      sourceUrl: true,
+      fileUrl: true,
+      status: true,
+      chunkCount: true,
+      createdAt: true,
+      metadata: true,
+      tags: true,
+    },
+    orderBy: {
+      createdAt: 'desc',
+    },
+  });
+
+  // Transform to add sourceType based on available data
+  return documents.map(doc => ({
+    ...doc,
+    sourceType: doc.sourceUrl ? 'SCRAPE' : 'UPLOAD',
+    uploadedFileName: doc.fileUrl ? doc.fileUrl.split('/').pop() : null,
+  }));
+}
+
 
 export async function createDocument(input: CreateDocumentInput) {
   const kb = await prisma.knowledgeBase.findFirst({
@@ -170,10 +200,10 @@ export async function processDocument(
     for (let index = 0; index < chunks.length; index++) {
       const chunk = chunks[index];
       const embedding = await generateEmbedding(chunk.text, embeddingModel);
-      
+
       // Convert embedding array to pgvector string format: '[0.1, 0.2, ...]'
       const vectorString = `[${embedding.join(',')}]`;
-      
+
       // Insert with raw SQL to use pgvector
       await prisma.$executeRaw`
         INSERT INTO "document_chunks" (

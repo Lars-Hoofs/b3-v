@@ -95,6 +95,20 @@ router.delete("/:id", async (req: AuthRequest, res) => {
   }
 });
 
+// Get knowledge base documents
+router.get("/:id/documents", async (req: AuthRequest, res) => {
+  try {
+    const documents = await kbService.getKnowledgeBaseDocuments(req.params.id);
+    res.json(documents);
+  } catch (error) {
+    if (error instanceof KnowledgeBaseError) {
+      return res.status(error.statusCode).json({ error: error.message });
+    }
+    console.error("Get KB documents error:", error);
+    res.status(500).json({ error: "Failed to fetch documents" });
+  }
+});
+
 // Create document
 router.post("/documents", async (req: AuthRequest, res) => {
   try {
