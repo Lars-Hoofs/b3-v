@@ -293,6 +293,15 @@ async function dynamicUrlDiscovery(baseUrl: string, maxPages: number = 0): Promi
     visitedUrls.add(currentUrl);
     processedCount++;
 
+    // Log progress every 10 pages
+    if (processedCount % 10 === 0) {
+      logger.info('URL discovery progress', {
+        processedCount,
+        discovered: discoveredUrls.size,
+        queueSize: queue.length
+      });
+    }
+
     let page = null;
     try {
       page = await browserPool.getPage();
@@ -391,7 +400,15 @@ export async function createScrapeJob(
   // Start the dynamic discovery process in the background
   setImmediate(async () => {
     try {
+      logger.info('Starting URL discovery for job', { jobId: job.id, baseUrl });
+
       const discoveredUrls = await dynamicUrlDiscovery(baseUrl, maxPages);
+
+      logger.info('URL discovery successful, updating job', {
+        jobId: job.id,
+        urlCount: discoveredUrls.length,
+        urls: discoveredUrls.slice(0, 5) // Log first 5 for debugging
+      });
 
       await prisma.scrapeJob.update({
         where: { id: job.id },
@@ -407,9 +424,12 @@ export async function createScrapeJob(
     } catch (error) {
       logger.error('Failed to discover URLs for job', {
         jobId: job.id,
+        baseUrl,
         error: error instanceof Error ? error.message : String(error),
         stack: error instanceof Error ? error.stack : undefined
       });
+
+      // Even on error, set the base URL as fallback so the job doesn't get stuck
       await prisma.scrapeJob.update({
         where: { id: job.id },
         data: {
