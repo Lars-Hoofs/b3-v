@@ -62,7 +62,29 @@ app.use(helmet({
   crossOriginOpenerPolicy: false,
 }));
 
-// CORS configuration - allow all in development
+// CRITICAL: PUBLIC widget/chat CORS middleware MUST come BEFORE general CORS
+// This allows widgets to work from ANY website (including file://)
+app.use((req, res, next) => {
+  const path = req.path;
+
+  // Check if this is a PUBLIC widget or chat endpoint
+  if (path.startsWith('/api/widgets/config/') ||
+    path.startsWith('/api/chat/')) {
+    res.setHeader("Access-Control-Allow-Origin", "*");
+    res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+    res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
+    res.setHeader("Cross-Origin-Resource-Policy", "cross-origin");
+
+    // Handle OPTIONS preflight
+    if (req.method === "OPTIONS") {
+      return res.status(204).send();
+    }
+  }
+
+  next();
+});
+
+// General CORS configuration for authenticated dashboard endpoints
 app.use(cors({
   origin: process.env.NODE_ENV === 'development'
     ? ['http://localhost:3000', 'http://localhost:3001', 'https://ai.bonsaimedia.nl']
