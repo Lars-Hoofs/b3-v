@@ -288,7 +288,8 @@ router.get("/config/:installCode", async (req, res) => {
     res.setHeader("Access-Control-Allow-Headers", "Content-Type");
     res.setHeader("Cross-Origin-Resource-Policy", "cross-origin");
 
-    const widget = await widgetService.getWidgetByInstallCode(req.params.installCode);
+    const widgetData = await widgetService.getWidgetByInstallCode(req.params.installCode);
+    const widget = widgetData as any; // Cast to any until Prisma client is regenerated
 
     // Return full widget configuration for rendering
     res.json({
@@ -379,6 +380,8 @@ router.get("/config/:installCode", async (req, res) => {
       showOnlineStatus: widget.showOnlineStatus,
       onlineStatusColor: widget.onlineStatusColor,
       avatarBackgroundColor: widget.avatarBackgroundColor,
+      headerAvatarUrl: widget.headerAvatarUrl, // Custom avatar image URL
+      headerAvatarEmoji: widget.headerAvatarEmoji, // Custom avatar emoji
 
       // Messages
       userMessageColor: widget.userMessageColor,
@@ -386,6 +389,7 @@ router.get("/config/:installCode", async (req, res) => {
       botMessageColor: widget.botMessageColor,
       botMessageTextColor: widget.botMessageTextColor,
       messageBorderRadius: widget.messageBorderRadius,
+      chatBackgroundColor: widget.chatBackgroundColor, // Chat messages area background
 
       // Input
       inputBorderColor: widget.inputBorderColor,
@@ -393,6 +397,9 @@ router.get("/config/:installCode", async (req, res) => {
       inputBackgroundColor: widget.inputBackgroundColor,
       inputTextColor: widget.inputTextColor,
       inputPlaceholderColor: widget.inputPlaceholderColor,
+      inputAreaBackgroundColor: widget.inputAreaBackgroundColor, // Input area background
+      inputAreaBorderColor: widget.inputAreaBorderColor, // Input area border
+      typingIndicatorColor: widget.typingIndicatorColor, // "AI is typing..." color
 
       // Send Button
       sendButtonIcon: widget.sendButtonIcon,
