@@ -171,22 +171,6 @@ app.get("/widget.js", (req, res) => {
   res.send(generateWidgetScript());
 });
 
-// CORS middleware for PUBLIC widget and chat endpoints
-// These need to work from ANY website (including file://)
-app.use(["/api/widgets/config/*", "/api/chat/*"], (req, res, next) => {
-  res.setHeader("Access-Control-Allow-Origin", "*");
-  res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
-  res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
-  res.setHeader("Cross-Origin-Resource-Policy", "cross-origin");
-
-  // Handle OPTIONS preflight
-  if (req.method === "OPTIONS") {
-    return res.status(204).send();
-  }
-
-  next();
-});
-
 // API routes - BASIC ONLY FOR NOW
 app.use("/api/workspaces", workspaceRoutes);
 app.use("/api/invites", inviteRoutes);
