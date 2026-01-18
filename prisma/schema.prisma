@@ -456,8 +456,8 @@ model Widget {
   
   // Branding
   showBranding  Boolean   @default(true)
-  brandingText  String    @default("Powered by AI Chat")
-  brandingUrl   String?
+  brandingText  String    @default("Powered by BonsaiMedia.nl")
+  brandingUrl   String?   @default("https://bonsaimedia.nl")
   
   // Advanced
   customCss     String?   @db.Text
