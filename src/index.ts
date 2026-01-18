@@ -151,7 +151,7 @@ app.get("/widget.js", (req, res) => {
 
 // CORS middleware for PUBLIC widget and chat endpoints
 // These need to work from ANY website (including file://)
-app.use(["/api/widgets/config", "/api/chat/conversations", "/api/chat/messages"], (req, res, next) => {
+app.use(["/api/widgets/config/*", "/api/chat/*"], (req, res, next) => {
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");

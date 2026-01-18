@@ -16,16 +16,13 @@ class SocketService {
   private activeTyping: Map<string, Set<string>> = new Map(); // conversationId -> Set of socketIds
 
   initialize(httpServer: HTTPServer) {
-    // Socket.io CORS configuration - secure in production
-    const allowedOrigins = env.NODE_ENV === 'development'
-      ? ['http://localhost:3000', 'http://localhost:3001', 'https://ai.bonsaimedia.nl']
-      : [env.BETTER_AUTH_URL];
-
+    // Socket.IO CORS configuration - allow ALL origins for widget support
+    // Widgets need to connect from ANY customer website (including file://)
     this.io = new SocketIOServer(httpServer, {
       cors: {
-        origin: allowedOrigins,
+        origin: "*",  // Allow all origins for public widget usage
         methods: ['GET', 'POST'],
-        credentials: true
+        credentials: false  // Can't use credentials with origin: "*"
       },
       transports: ['websocket', 'polling'],
       pingTimeout: 60000,
@@ -36,12 +33,12 @@ class SocketService {
     this.io.use(async (socket, next) => {
       try {
         const token = socket.handshake.auth.token;
-        
+
         // If token provided, verify it
         if (token) {
           try {
             const decoded = jwt.verify(token, process.env.BETTER_AUTH_SECRET!) as any;
-            
+
             // Load user data
             const user = await prisma.user.findUnique({
               where: { id: decoded.userId || decoded.sub },
@@ -65,7 +62,7 @@ class SocketService {
             logger.warn('Invalid token, allowing as visitor', { error: (error as Error)?.message });
           }
         }
-        
+
         // Allow connection (with or without auth)
         next();
       } catch (error) {
@@ -76,7 +73,7 @@ class SocketService {
 
     this.io.on('connection', (socket: Socket) => {
       logger.info('Socket connected', { socketId: socket.id });
-      
+
       // If user is authenticated, join their user room for direct messages
       if (socket.data.userId) {
         socket.join(`user:${socket.data.userId}`);
@@ -87,13 +84,13 @@ class SocketService {
       socket.on('join:workspace', async (data: { workspaceId: string }) => {
         try {
           const { workspaceId } = data;
-          
+
           // Only authenticated users can join workspace rooms
           if (!socket.data.userId) {
             socket.emit('error', { message: 'Authentication required' });
             return;
           }
-          
+
           // Verify user has access to workspace
           const membership = await prisma.workspaceMember.findFirst({
             where: {
@@ -102,21 +99,21 @@ class SocketService {
               deletedAt: null
             }
           });
-          
+
           if (!membership) {
             socket.emit('error', { message: 'Not a member of this workspace' });
             return;
           }
-          
+
           // Join workspace room
           socket.join(`workspace:${workspaceId}`);
-          
+
           logger.info('Socket joined workspace', {
             socketId: socket.id,
             userId: socket.data.userId,
             workspaceId
           });
-          
+
           // Send confirmation
           socket.emit('workspace:joined', {
             workspaceId,
@@ -130,7 +127,7 @@ class SocketService {
           socket.emit('error', { message: 'Failed to join workspace' });
         }
       });
-      
+
       // Handle authentication and join conversation
       socket.on('join:conversation', async (data: { conversationId: string; visitorId?: string }) => {
         try {
@@ -307,7 +304,7 @@ class SocketService {
       // Handle disconnect
       socket.on('disconnect', () => {
         const socketData = socket.data as SocketData;
-        
+
         if (socketData?.conversationId) {
           // Clean up typing indicators
           this.stopTyping(socketData.conversationId, socket.id);
@@ -335,7 +332,7 @@ class SocketService {
   // Broadcast new message to conversation
   broadcastMessage(conversationId: string, message: any) {
     if (!this.io) return;
-    
+
     this.io.to(`conversation:${conversationId}`).emit('message:new', {
       ...message,
       timestamp: new Date()
@@ -345,7 +342,7 @@ class SocketService {
   // Broadcast AI response started
   broadcastAIResponseStarted(conversationId: string) {
     if (!this.io) return;
-    
+
     this.io.to(`conversation:${conversationId}`).emit('ai:thinking', {
       conversationId,
       timestamp: new Date()
@@ -355,7 +352,7 @@ class SocketService {
   // Broadcast AI response completed
   broadcastAIResponseCompleted(conversationId: string, message: any) {
     if (!this.io) return;
-    
+
     this.io.to(`conversation:${conversationId}`).emit('ai:response', {
       ...message,
       timestamp: new Date()
@@ -365,14 +362,14 @@ class SocketService {
   // Broadcast agent assignment
   broadcastAgentAssigned(conversationId: string, agentId: string) {
     if (!this.io) return;
-    
+
     this.io.to(`conversation:${conversationId}`).emit('agent:assigned', {
       conversationId,
       agentId,
       timestamp: new Date()
     });
   }
-  
+
   // Notify online agents in workspace that human handoff was requested
   notifyHumanAgentRequested(workspaceId: string, data: {
     conversationId: string;
@@ -380,12 +377,12 @@ class SocketService {
     lastMessage: string;
   }) {
     if (!this.io) return;
-    
+
     this.io.to(`workspace:${workspaceId}`).emit('conversation:human-requested', {
       ...data,
       timestamp: new Date()
     });
-    
+
     logger.info('Human agent request notification sent', {
       workspaceId,
       conversationId: data.conversationId
@@ -395,7 +392,7 @@ class SocketService {
   // Broadcast media attachment uploaded
   broadcastMediaAttachment(conversationId: string, attachment: any) {
     if (!this.io) return;
-    
+
     this.io.to(`conversation:${conversationId}`).emit('media:uploaded', {
       conversationId,
       attachment,
@@ -412,7 +409,7 @@ class SocketService {
     total: number; // bytes
   }) {
     if (!this.io) return;
-    
+
     this.io.to(`conversation:${conversationId}`).emit('media:progress', {
       conversationId,
       ...data,
@@ -427,7 +424,7 @@ class SocketService {
     message?: string;
   }) {
     if (!this.io) return;
-    
+
     this.io.to(`conversation:${conversationId}`).emit('media:processing', {
       conversationId,
       ...data,
@@ -438,7 +435,7 @@ class SocketService {
   // Broadcast media deleted
   broadcastMediaDeleted(conversationId: string, attachmentId: string) {
     if (!this.io) return;
-    
+
     this.io.to(`conversation:${conversationId}`).emit('media:deleted', {
       conversationId,
       attachmentId,
@@ -467,11 +464,11 @@ class SocketService {
   getIO(): SocketIOServer | null {
     return this.io;
   }
-  
+
   // Emit event to specific user by userId
   emitToUser(userId: string, event: string, data: any) {
     if (!this.io) return;
-    
+
     this.io.to(`user:${userId}`).emit(event, {
       ...data,
       timestamp: new Date()
