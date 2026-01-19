@@ -474,24 +474,60 @@ export async function startScrapingJob(
     data: { status: 'IN_PROGRESS', selectedUrls, totalUrls: selectedUrls.length },
   });
 
+  // Import addDocument to save scraped content to knowledge base
+  const { addDocument } = await import('./knowledgeBase.service');
+
   // Process URLs sequentially to avoid overwhelming the server
   setImmediate(async () => {
     const results = [];
     let scrapedCount = 0;
+    let savedCount = 0;
 
     for (const url of selectedUrls) {
-      const result = await scrapeWebsite(url, job.knowledgeBaseId, 2);
-      if (result) { // Only add if scraping was successful and content was found
-        results.push(result);
-        scrapedCount++;
-      }
+      try {
+        const result = await scrapeWebsite(url, job.knowledgeBaseId, 2);
 
-      // Update progress periodically
-      if (scrapedCount % 10 === 0) {
-        await prisma.scrapeJob.update({
-          where: { id: jobId },
-          data: { scrapedCount, scrapedUrls: results.map(r => r.url) }
-        });
+        if (result && result.content && result.content.length >= 50) {
+          // KRITIEK: Sla de gescrapede content op in de knowledge base!
+          // Dit maakt documenten en genereert embeddings voor vector search
+          try {
+            await addDocument({
+              knowledgeBaseId: job.knowledgeBaseId,
+              title: result.title || url,
+              content: result.content,
+              sourceUrl: url,
+              metadata: {
+                description: result.description,
+                mainImage: result.mainImage,
+                scrapedAt: result.scrapedAt,
+                hash: result.hash,
+              },
+              tags: ['scraped'],
+            });
+
+            savedCount++;
+            logger.info('Document saved to knowledge base', { url, contentLength: result.content.length });
+          } catch (saveError) {
+            logger.error('Failed to save document', { url, error: saveError instanceof Error ? saveError.message : 'Unknown' });
+          }
+
+          results.push(result);
+          scrapedCount++;
+        }
+
+        // Update progress periodically
+        if (scrapedCount % 5 === 0 || scrapedCount === selectedUrls.length) {
+          await prisma.scrapeJob.update({
+            where: { id: jobId },
+            data: {
+              scrapedCount,
+              scrapedUrls: results.map(r => r.url),
+              metadata: { savedCount } as any,
+            }
+          });
+        }
+      } catch (error) {
+        logger.error('Error processing URL', { url, error: error instanceof Error ? error.message : 'Unknown' });
       }
     }
 
@@ -501,9 +537,12 @@ export async function startScrapingJob(
       data: {
         status: 'COMPLETED',
         completedAt: new Date(),
-        scrapedCount
+        scrapedCount,
+        metadata: { savedCount, totalProcessed: selectedUrls.length } as any,
       }
     });
+
+    logger.info('Scraping job completed', { jobId, scrapedCount, savedCount, totalUrls: selectedUrls.length });
   });
 
   logger.info('Dynamic scraping job started', { jobId, urlCount: selectedUrls.length });
