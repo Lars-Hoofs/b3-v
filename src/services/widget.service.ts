@@ -40,48 +40,48 @@ export async function createWidget(input: CreateWidgetInput) {
       name,
       widgetType: widgetConfig.widgetType || "bubble",
       position: widgetConfig.position || "bottom-right",
-      offsetX: widgetConfig.offsetX || 0,
-      offsetY: widgetConfig.offsetY || 0,
-      primaryColor: widgetConfig.primaryColor || "#6366f1",
+      offsetX: widgetConfig.offsetX || 20,
+      offsetY: widgetConfig.offsetY || 20,
+      primaryColor: widgetConfig.primaryColor || "#000000",
       theme: widgetConfig.theme || "light",
 
       // Bubble customization
-      bubbleIcon: widgetConfig.bubbleIcon,
+      bubbleIcon: widgetConfig.bubbleIcon || "RiChat1Fill",
       bubbleText: widgetConfig.bubbleText,
       bubbleShape: widgetConfig.bubbleShape || "circle",
       bubbleSize: widgetConfig.bubbleSize || "medium",
       bubbleWidth: widgetConfig.bubbleWidth,
       bubbleHeight: widgetConfig.bubbleHeight,
-      bubbleBackgroundColor: widgetConfig.bubbleBackgroundColor || "#6366f1",
+      bubbleBackgroundColor: widgetConfig.bubbleBackgroundColor || "#000000",
       bubbleTextColor: widgetConfig.bubbleTextColor || "#ffffff",
 
       // Chat window
-      chatWidth: widgetConfig.chatWidth || 400,
-      chatHeight: widgetConfig.chatHeight || 600,
-      chatBorderRadius: widgetConfig.chatBorderRadius || 16,
+      chatWidth: widgetConfig.chatWidth || 380,
+      chatHeight: widgetConfig.chatHeight || 650,
+      chatBorderRadius: widgetConfig.chatBorderRadius || 24,
 
       // Header
-      headerTitle: widgetConfig.headerTitle,
-      headerSubtitle: widgetConfig.headerSubtitle,
-      headerBackgroundColor: widgetConfig.headerBackgroundColor || "#6366f1",
-      headerTextColor: widgetConfig.headerTextColor || "#ffffff",
+      headerTitle: widgetConfig.headerTitle || "Chat Assistant",
+      headerSubtitle: widgetConfig.headerSubtitle || "Ask me anything",
+      headerBackgroundColor: widgetConfig.headerBackgroundColor || "#ffffff",
+      headerTextColor: widgetConfig.headerTextColor || "#000000",
 
       // Messages
-      userMessageColor: widgetConfig.userMessageColor || "#6366f1",
+      userMessageColor: widgetConfig.userMessageColor || "#000000",
       userMessageTextColor: widgetConfig.userMessageTextColor || "#ffffff",
-      botMessageColor: widgetConfig.botMessageColor || "#f3f4f6",
-      botMessageTextColor: widgetConfig.botMessageTextColor || "#111827",
-      messageBorderRadius: widgetConfig.messageBorderRadius || 12,
+      botMessageColor: widgetConfig.botMessageColor || "#f3f4f6", // Zinc-100
+      botMessageTextColor: widgetConfig.botMessageTextColor || "#111827", // Zinc-900
+      messageBorderRadius: widgetConfig.messageBorderRadius || 16,
 
       // Behavior
-      greeting: widgetConfig.greeting,
-      placeholder: widgetConfig.placeholder || "Type your message...",
+      greeting: widgetConfig.greeting || "Hey there!\n\nNeed answers or help with your to-do list? I've got you covered!\n\nJust type what you need, and let's dive into making things happen.",
+      placeholder: widgetConfig.placeholder || "Type here...",
       suggestedQuestions: widgetConfig.suggestedQuestions || [],
       autoOpen: widgetConfig.autoOpen ?? false,
       autoOpenDelay: widgetConfig.autoOpenDelay || 5000,
 
       // Branding & advanced
-      showBranding: widgetConfig.showBranding ?? true,
+      showBranding: widgetConfig.showBranding ?? false, // Cleaner by default
       customCss: widgetConfig.customCss,
       allowedDomains: widgetConfig.allowedDomains || [],
       zIndex: widgetConfig.zIndex || 999999,
@@ -781,32 +781,34 @@ function getCustomBoxHTML(cfg) {
 
 function getChatWindowHTML(cfg, apiUrl) {
   // Close button customization
-  const closeIconColor = cfg.headerCloseIconColor || cfg.headerTextColor;
-  const closeIconBg = cfg.headerCloseIconBackgroundColor || 'rgba(255,255,255,0.1)';
-  const closeIconHtml = cfg.headerCloseIcon ? getIconHtml(cfg.headerCloseIcon, 20, closeIconColor) : '&times;';
+  // Default to black icon if header is white, otherwise match text color
+  const closeIconColor = cfg.headerCloseIconColor || (cfg.headerBackgroundColor === '#ffffff' ? '#000000' : cfg.headerTextColor);
+  const closeIconBg = cfg.headerCloseIconBackgroundColor || 'transparent'; 
+  const closeIconHtml = cfg.headerCloseIcon ? getIconHtml(cfg.headerCloseIcon, 24, closeIconColor) : 
+    '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>';
 
   // Add hover styles for close button
-  if (cfg.headerCloseIconHoverColor || cfg.headerCloseIconHoverBackgroundColor) {
+  if (true) {
     const hoverStyle = document.createElement('style');
     let css = '#ai-chat-close:hover { ';
-    if (cfg.headerCloseIconHoverColor) css += 'color: ' + cfg.headerCloseIconHoverColor + ' !important; ';
-    if (cfg.headerCloseIconHoverBackgroundColor) css += 'background: ' + cfg.headerCloseIconHoverBackgroundColor + ' !important; ';
+    css += 'background: ' + (cfg.headerCloseIconHoverBackgroundColor || 'rgba(0,0,0,0.05)') + ' !important; ';
+    css += 'transform: scale(1.1); ';
     css += '}';
     hoverStyle.textContent = css;
     document.head.appendChild(hoverStyle);
   }
 
-  // Avatar and online status colors
-  const avatarBg = cfg.avatarBackgroundColor || 'rgba(255,255,255,0.15)';
-  const onlineColor = cfg.onlineStatusColor || '#22c55e';
+  // Avatar and online status
+  const avatarBg = cfg.avatarBackgroundColor || 'transparent';
+  const onlineColor = cfg.onlineStatusColor || '#10b981';
 
   // Input field customization
-  const inputBorderColor = cfg.inputBorderColor || '#e5e7eb';
+  const inputBorderColor = cfg.inputBorderColor || 'transparent';
   const inputFocusBorderColor = cfg.inputFocusBorderColor || cfg.primaryColor;
-  const inputBgColor = cfg.inputBackgroundColor || '#ffffff';
+  const inputBgColor = cfg.inputBackgroundColor || '#f3f4f6';
   const inputTextColor = cfg.inputTextColor || '#1f2937';
 
-  // Add placeholder color style if set
+  // Add placeholder color style
   if (cfg.inputPlaceholderColor) {
     const style = document.createElement('style');
     style.textContent = '#ai-chat-input::placeholder { color: ' + cfg.inputPlaceholderColor + '; }';
@@ -814,40 +816,45 @@ function getChatWindowHTML(cfg, apiUrl) {
   }
 
   // Send button customization
-  const sendBtnBg = cfg.sendButtonBackgroundColor || cfg.primaryColor;
-  const sendBtnIconColor = cfg.sendButtonIconColor || '#ffffff';
-  const sendIconHtml = cfg.sendButtonIcon ? getIconHtml(cfg.sendButtonIcon, 20, sendBtnIconColor) : '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>';
+  const sendBtnBg = cfg.sendButtonBackgroundColor || 'transparent';
+  const sendBtnIconColor = cfg.sendButtonIconColor || (cfg.primaryColor || '#000000');
+  const sendIconHtml = cfg.sendButtonIcon ? getIconHtml(cfg.sendButtonIcon, 24, sendBtnIconColor) : 
+    '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>';
 
   // Add hover styles for send button
-  if (cfg.sendButtonHoverBackgroundColor || cfg.sendButtonHoverIconColor) {
+  if (true) {
     const hoverStyle = document.createElement('style');
     let css = '#ai-chat-send:hover { ';
-    if (cfg.sendButtonHoverBackgroundColor) css += 'background: ' + cfg.sendButtonHoverBackgroundColor + ' !important; ';
-    if (cfg.sendButtonHoverIconColor) css += 'color: ' + cfg.sendButtonHoverIconColor + ' !important; ';
+    css += 'background: ' + (cfg.sendButtonHoverBackgroundColor || 'rgba(0,0,0,0.05)') + ' !important; ';
+    css += 'transform: scale(1.1) rotate(-10deg); ';
     css += '}';
     hoverStyle.textContent = css;
     document.head.appendChild(hoverStyle);
   }
-  // Avatar - support custom image, emoji, or fallback
-  let avatarContent = '👤'; // Default emoji
+  
+  // Avatar Content
+  let avatarContent = '';
   if (cfg.headerAvatarUrl) {
     avatarContent = '<img src="' + cfg.headerAvatarUrl + '" alt="Avatar" style="width: 100%; height: 100%; object-fit: cover;" />';
   } else if (cfg.headerAvatarEmoji) {
     avatarContent = cfg.headerAvatarEmoji;
+  } else {
+    // Elegant gradient fallback
+    avatarContent = '<div style="width: 100%; height: 100%; background: linear-gradient(135deg, #e0c3fc 0%, #8ec5fc 100%);"></div>';
   }
 
-  // Configurable colors with sensible defaults
-  let chatBgColor = cfg.chatBackgroundColor || '#f9fafb';
+  // Colors
+  let chatBgColor = cfg.chatBackgroundColor || '#ffffff';
   let inputAreaBgColor = cfg.inputAreaBackgroundColor || '#ffffff';
-  let inputAreaBorderColor = cfg.inputAreaBorderColor || '#f3f4f6';
-  let headerBgColor = cfg.headerBackgroundColor; // Default
-  const typingColor = cfg.typingIndicatorColor || '#6b7280';
+  let inputAreaBorderColor = cfg.inputAreaBorderColor || 'transparent';
+  let headerBgColor = cfg.headerBackgroundColor || '#ffffff';
+  const typingColor = cfg.typingIndicatorColor || '#9ca3af';
 
   // Glass Effect overrides
   if (cfg.glassEffect) {
      headerBgColor = 'transparent';
      chatBgColor = 'transparent';
-     inputAreaBgColor = 'rgba(255,255,255,0.4)';
+     inputAreaBgColor = 'rgba(255,255,255,0.6)';
      inputAreaBorderColor = 'rgba(255,255,255,0.2)';
      if (cfg.theme === 'dark') {
         inputAreaBgColor = 'rgba(0,0,0,0.3)';
@@ -855,30 +862,31 @@ function getChatWindowHTML(cfg, apiUrl) {
      }
   }
 
-  return '<div style=\"background: ' + headerBgColor + '; color: ' + cfg.headerTextColor + '; padding: 20px; display: flex; align-items: center; justify-content: space-between;\">' +
+  // HTML Construction
+  return '<div style=\"background: ' + headerBgColor + '; color: ' + cfg.headerTextColor + '; padding: 20px 24px; display: flex; align-items: center; justify-content: space-between;\">' +
     '<div style=\"display: flex; align-items: center; gap: 16px;\">' +
-    (cfg.showAgentAvatar ? '<div style=\"width: 44px; height: 44px; border-radius: 50%; background: ' + avatarBg + '; display: flex; align-items: center; justify-content: center; overflow: hidden; backdrop-filter: blur(4px); box-shadow: 0 2px 8px rgba(0,0,0,0.1);\">' + avatarContent + '</div>' : '') +
+    (cfg.showAgentAvatar !== false ? '<div style=\"width: 48px; height: 48px; border-radius: 16px; background: ' + avatarBg + '; display: flex; align-items: center; justify-content: center; overflow: hidden; box-shadow: 0 4px 12px rgba(0,0,0,0.05);\">' + avatarContent + '</div>' : '') +
     '<div>' +
-    '<div style=\"font-weight: 700; font-size: 18px; letter-spacing: -0.02em;\">' + (cfg.headerTitle || 'Chat Support') + '</div>' +
-    (cfg.headerSubtitle ? '<div style=\"font-size: 13px; opacity: 0.9; margin-top: 2px;\">' + cfg.headerSubtitle + '</div>' : '') +
-    (cfg.showOnlineStatus ? '<div style=\"display: flex; align-items: center; gap: 6px; font-size: 12px; opacity: 0.9; margin-top: 4px;\"><span style=\"width: 8px; height: 8px; background: ' + onlineColor + '; border-radius: 50%; display: inline-block; border: 1.5px solid rgba(255,255,255,0.5);\"></span> Online</div>' : '') +
+    (cfg.headerTitle ? '<div style=\"font-weight: 700; font-size: 18px; letter-spacing: -0.02em;\">' + cfg.headerTitle + '</div>' : '') +
+    (cfg.headerSubtitle ? '<div style=\"font-size: 13px; opacity: 0.6; margin-top: 2px;\">' + cfg.headerSubtitle + '</div>' : '') +
+    (cfg.showOnlineStatus ? '<div style=\"display: flex; align-items: center; gap: 6px; font-size: 12px; opacity: 0.8; margin-top: 4px;\"><span style=\"width: 8px; height: 8px; background: ' + onlineColor + '; border-radius: 50%; display: inline-block; border: 1.5px solid #fff;\"></span> Online</div>' : '') +
     '</div>' +
     '</div>' +
-    '<button id=\"ai-chat-close\" style=\"background: ' + closeIconBg + '; border: none; color: ' + closeIconColor + '; font-size: 20px; cursor: pointer; padding: 0; width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center; transition: background 0.2s, color 0.2s;\">' +
+    '<button id=\"ai-chat-close\" style=\"background: ' + closeIconBg + '; border: none; color: ' + closeIconColor + '; font-size: 20px; cursor: pointer; padding: 0; width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; transition: all 0.2s;\">' +
     closeIconHtml +
     '</button>' +
     '</div>' +
-    '<div id=\"ai-chat-messages\" style=\"flex: 1; overflow-y: auto; padding: 20px; display: flex; flex-direction: column; gap: 16px; background: ' + chatBgColor + ';\"></div>' +
-    '<div style=\"padding: 20px; border-top: 1px solid ' + inputAreaBorderColor + '; background: ' + inputAreaBgColor + ';\">' +
-    '<div id=\"ai-chat-typing\" style=\"display: none; color: ' + typingColor + '; font-size: 12px; margin-bottom: 12px; padding-left: 4px;\">AI is typing...</div>' +
-    '<div style=\"display: flex; gap: 12px; align-items: flex-end;\">' +
-    '<input id=\"ai-chat-input\" type=\"text\" placeholder=\"' + cfg.placeholder + '\" style=\"flex: 1; padding: 12px 16px; border: 1px solid ' + inputBorderColor + '; border-radius: 12px; font-size: 15px; outline: none; transition: border-color 0.2s, box-shadow 0.2s; background: ' + inputBgColor + '; color: ' + inputTextColor + ';\" onfocus=\"this.style.borderColor=\\'' + inputFocusBorderColor + '\\'; this.style.boxShadow=\\'0 0 0 3px rgba(99, 102, 241, 0.1) \\';\" onblur=\"this.style.borderColor=\\'' + inputBorderColor + '\\'; this.style.boxShadow=\\'none\\';\" />' +
-      '<button id=\"ai-chat-send\" style=\"background: ' + sendBtnBg + '; color: ' + sendBtnIconColor + '; border: none; padding: 0; width: 46px; height: 46px; border-radius: 12px; font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0; transition: transform 0.1s, background 0.2s, color 0.2s; box-shadow: 0 4px 12px rgba(0,0,0,0.1);\" onmousedown=\"this.style.transform=\\'scale(0.95) \\'\" onmouseup=\"this.style.transform=\\'scale(1) \\'\">' +
+    '<div id=\"ai-chat-messages\" style=\"flex: 1; overflow-y: auto; padding: 24px; display: flex; flex-direction: column; gap: 24px; background: ' + chatBgColor + ';\"></div>' +
+    '<div style=\"padding: 20px 24px; border-top: 1px solid ' + inputAreaBorderColor + '; background: ' + inputAreaBgColor + ';\">' +
+    '<div id=\"ai-chat-typing\" style=\"display: none; color: ' + typingColor + '; font-size: 12px; margin-bottom: 12px; padding-left: 4px; font-weight: 500;\">AI is typing...</div>' +
+    '<div style=\"display: flex; gap: 12px; align-items: center; background: ' + inputBgColor + '; border-radius: 32px; padding: 6px 6px 6px 20px; border: 1px solid ' + inputBorderColor + '; transition: all 0.2s; box-shadow: 0 2px 6px rgba(0,0,0,0.02);\" onfocusin=\"this.style.boxShadow=\\'0 4px 12px rgba(0,0,0,0.08)\\'; this.style.background=\\'#fff\\';\" onfocusout=\"this.style.boxShadow=\\'0 2px 6px rgba(0,0,0,0.02)\\'; this.style.background=\\'' + inputBgColor + '\\';\">' +
+    '<input id=\"ai-chat-input\" type=\"text\" placeholder=\"' + cfg.placeholder + '\" style=\"flex: 1; border: none; font-size: 15px; outline: none; background: transparent; color: ' + inputTextColor + '; padding: 10px 0;\" />' +
+      '<button id=\"ai-chat-send\" style=\"background: ' + sendBtnBg + '; color: ' + sendBtnIconColor + '; border: none; padding: 0; width: 42px; height: 42px; border-radius: 50%; font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0; transition: all 0.2s;\">' +
         sendIconHtml +
         '</button>' +
         '</div>' +
         '</div>' +
-        (cfg.showBranding ? '<div style=\"padding: 8px; text-align: center; font-size: 11px; color: #9ca3af; background: ' + chatBgColor + '; border-top: 1px solid ' + inputAreaBorderColor + ';\"><a href=\"' + (cfg.brandingUrl || 'https://bonsaimedia.nl') + '\" target=\"_blank\" style=\"color: inherit; text-decoration: none;\">' + (cfg.brandingText || 'Powered by BonsaiMedia.nl') + '</a></div>' : '');
+        (cfg.showBranding ? '<div style=\"padding: 8px; text-align: center; font-size: 11px; color: #d1d5db; background: ' + chatBgColor + ';\"><a href=\"' + (cfg.brandingUrl || 'https://bonsaimedia.nl') + '\" target=\"_blank\" style=\"color: inherit; text-decoration: none;\">' + (cfg.brandingText || 'Powered by Bonsai') + '</a></div>' : '');
 }
 
   function getChatWindowStyles(cfg) {
@@ -890,24 +898,14 @@ function getChatWindowHTML(cfg, apiUrl) {
     let background = '#ffffff'; // Fallback
     if (cfg.chatBackgroundColor) background = cfg.chatBackgroundColor;
   
-    // Gradient override
-    if (cfg.backgroundGradient && cfg.backgroundGradient.from && cfg.backgroundGradient.to) {
-      // If glass is enabled, we might want the chat window to be white/solid usually, 
-      // but if they want the gradient on the window too:
-      // background = \`linear-gradient(...)\`; 
-      // Typically chat windows are solid reading surfaces. Let's keep it solid or glass.
-    }
-  
     // Glass Effect for Window
     let glassEffectCss = '';
     if (cfg.glassEffect) {
-      const blur = cfg.backdropBlur || 12;
-      // Make background semi-transparent if it's currently hex
-      // This is a naive heuristic; usually we want rgba(255,255,255, 0.8) for glass
+      const blur = cfg.backdropBlur || 20;
       background = 'rgba(255, 255, 255, 0.85)';
-      if (cfg.theme === 'dark') background = 'rgba(20, 20, 20, 0.85)';
+      if (cfg.theme === 'dark') background = 'rgba(30, 30, 30, 0.85)';
   
-      glassEffectCss = \`backdrop-filter: blur(\${blur}px); -webkit-backdrop-filter: blur(\${blur}px); border: 1px solid rgba(255,255,255,0.2);\`;
+      glassEffectCss = \`backdrop-filter: blur(\${blur}px); -webkit-backdrop-filter: blur(\${blur}px); border: 1px solid rgba(255,255,255,0.4);\`;
     }
   
     let sizeStyles = '';
@@ -916,12 +914,12 @@ function getChatWindowHTML(cfg, apiUrl) {
     // Determine size based on layout mode
     switch (layoutMode) {
       case 'full-height':
-        sizeStyles = 'width: ' + (cfg.chatWidth || 400) + 'px; height: calc(100vh - 40px); ';
+        sizeStyles = 'width: ' + (cfg.chatWidth || 380) + 'px; height: calc(100vh - 40px); ';
         positionStyles = 'position: fixed; bottom: 20px; right: ' + (20 - chatOffsetX) + 'px; ';
         break;
   
       case 'full-width':
-        sizeStyles = 'width: 100vw; height: ' + (cfg.chatHeight || 600) + 'px; ';
+        sizeStyles = 'width: 100vw; height: ' + (cfg.chatHeight || 650) + 'px; ';
         positionStyles = 'position: fixed; bottom: ' + (-chatOffsetY) + 'px; left: 0; ';
         break;
   
@@ -935,17 +933,16 @@ function getChatWindowHTML(cfg, apiUrl) {
   
       case 'fixed':
       default:
-        sizeStyles = 'width: ' + (cfg.chatWidth || 400) + 'px; height: ' + (cfg.chatHeight || 600) + 'px; ';
-        positionStyles = 'position: absolute; bottom: ' + (80 - chatOffsetY) + 'px; right: ' + (-chatOffsetX) + 'px; ';
-        // Note: 'bottom: 80px' helps position it above the bubble usually
+        sizeStyles = 'width: ' + (cfg.chatWidth || 380) + 'px; height: ' + (cfg.chatHeight || 650) + 'px; ';
+        positionStyles = 'position: absolute; bottom: ' + (100 - chatOffsetY) + 'px; right: ' + (-chatOffsetX) + 'px; ';
         break;
     }
   
     return sizeStyles + positionStyles +
       'background: ' + background + '; ' +
       'border-radius: ' + (cfg.chatBorderRadius || 24) + 'px; ' +
-      'box-shadow: ' + (cfg.shadowIntensity === 'none' ? 'none' : '0 12px 48px rgba(0,0,0,0.12), 0 4px 16px rgba(0,0,0,0.04)') + '; ' +
-      'border: ' + (cfg.glassEffect ? '1px solid rgba(255,255,255,0.2)' : '1px solid rgba(0,0,0,0.08)') + '; ' +
+      'box-shadow: ' + (cfg.shadowIntensity === 'none' ? 'none' : '0 24px 60px -12px rgba(0,0,0,0.14), 0 12px 24px -4px rgba(0,0,0,0.06)') + '; ' +
+      'border: ' + (cfg.glassEffect ? '1px solid rgba(255,255,255,0.4)' : '1px solid rgba(0,0,0,0.06)') + '; ' +
       'display: flex; flex-direction: column; ' +
       'overflow: hidden; ' +
       'font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; ' +
@@ -1419,14 +1416,19 @@ function initializeChat(cfg, apiUrl) {
 function appendMessage(content, isUser, cfg, sources) {
   const messagesContainer = document.getElementById('ai-chat-messages');
   const msgDiv = document.createElement('div');
-  msgDiv.style.cssText = 'max-width: 80%; padding: 12px 16px; border-radius: ' + cfg.messageBorderRadius + 'px; ' +
+  
+  // Clean message styling
+  msgDiv.style.cssText = 'max-width: 85%; padding: 14px 18px; border-radius: ' + (cfg.messageBorderRadius || 18) + 'px; ' +
     'background: ' + (isUser ? cfg.userMessageColor : cfg.botMessageColor) + '; ' +
     'color: ' + (isUser ? (cfg.userMessageTextColor || '#ffffff') : (cfg.botMessageTextColor || cfg.messageTextColor)) + '; ' +
     'align-self: ' + (isUser ? 'flex-end' : 'flex-start') + '; ' +
-    'font-size: 15px; line-height: 1.5; word-wrap: break-word; ' +
-    'box-shadow: 0 1px 2px rgba(0,0,0,0.05); ' +
-    'animation: slideIn 0.3s ease-out;';
-  msgDiv.textContent = content;
+    'font-size: 15px; line-height: 1.6; word-wrap: break-word; ' +
+    // Add subtle shadow to user messages if they are close to white
+    ((isUser && (cfg.userMessageColor === '#ffffff' || cfg.userMessageColor === '#fff')) ? 'box-shadow: 0 2px 8px rgba(0,0,0,0.04); border: 1px solid rgba(0,0,0,0.04); ' : '') +
+    'animation: slideIn 0.3s cubic-bezier(0.2, 0.8, 0.2, 1);';
+    
+  // Handle newlines
+  msgDiv.innerHTML = content.replace(/\n/g, '<br>');
 
   // Add sources if available (for AI messages)
   if (!isUser && sources && sources.length > 0 && cfg.showSources !== false) {
@@ -1434,7 +1436,7 @@ function appendMessage(content, isUser, cfg, sources) {
     const visibleSources = sources.slice(0, maxSources);
 
     const sourcesDiv = document.createElement('div');
-    sourcesDiv.style.cssText = 'margin-top: 10px; padding-top: 8px; border-top: 1px solid rgba(0,0,0,0.05); display: flex; gap: 8px; flex-wrap: wrap; align-items: center;';
+    sourcesDiv.style.cssText = 'margin-top: 12px; padding-top: 10px; border-top: 1px solid rgba(0,0,0,0.05); display: flex; gap: 8px; flex-wrap: wrap; align-items: center;';
 
     let hasValidSource = false;
     visibleSources.forEach(s => {
