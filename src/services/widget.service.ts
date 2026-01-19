@@ -953,6 +953,53 @@ function getChatWindowHTML(cfg, apiUrl) {
       glassEffectCss;
   }
 
+  function getAnimation(type) {
+    if (!type || type === 'none') return 'none';
+    
+    // Normalize type
+    if (type === 'slide') type = 'slide-up';
+    
+    let name = 'aiAnim-' + type;
+    let keyframes = '';
+    
+    // If style already exists, just return the animation name (assuming we use standard names)
+    // We'll use specific names for keyframes
+    let keyframeName = 'aiKeyframe' + type;
+
+    if (document.getElementById('ai-style-' + type)) return keyframeName;
+
+    switch (type) {
+      case 'bounce':
+        keyframes = \`@keyframes \${keyframeName} { 
+          0%, 20%, 50%, 80%, 100% { transform: translateY(0); } 
+          40% { transform: translateY(-10px); } 
+          60% { transform: translateY(-5px); } 
+        }\`;
+        break;
+      case 'fade':
+        keyframes = \`@keyframes \${keyframeName} { from { opacity: 0; } to { opacity: 1; } }\`;
+        break;
+      case 'scale':
+        keyframes = \`@keyframes \${keyframeName} { from { transform: scale(0); opacity: 0; } to { transform: scale(1); opacity: 1; } }\`;
+        break;
+      case 'slide-up':
+        keyframes = \`@keyframes \${keyframeName} { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }\`;
+        break;
+      case 'flip':
+        keyframes = \`@keyframes \${keyframeName} { from { transform: perspective(400px) rotateY(90deg); opacity: 0; } to { transform: perspective(400px) rotateY(0deg); opacity: 1; } }\`;
+        break;
+      default:
+        return 'none';
+    }
+    
+    const style = document.createElement('style');
+    style.id = 'ai-style-' + type;
+    style.textContent = keyframes;
+    document.head.appendChild(style);
+    
+    return keyframeName;
+  }
+
   function applyOpenAnimation(el, type, duration = 300) {
     // Reset previous animation
     el.style.animation = 'none';
