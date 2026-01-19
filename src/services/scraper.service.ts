@@ -474,8 +474,8 @@ export async function startScrapingJob(
     data: { status: 'IN_PROGRESS', selectedUrls, totalUrls: selectedUrls.length },
   });
 
-  // Import addDocument to save scraped content to knowledge base
-  const { addDocument } = await import('./knowledgeBase.service');
+  // Import createDocument to save scraped content to knowledge base
+  const { createDocument } = await import('./knowledgeBase.service');
 
   // Process URLs sequentially to avoid overwhelming the server
   setImmediate(async () => {
@@ -491,7 +491,7 @@ export async function startScrapingJob(
           // KRITIEK: Sla de gescrapede content op in de knowledge base!
           // Dit maakt documenten en genereert embeddings voor vector search
           try {
-            await addDocument({
+            await createDocument({
               knowledgeBaseId: job.knowledgeBaseId,
               title: result.title || url,
               content: result.content,
@@ -522,7 +522,6 @@ export async function startScrapingJob(
             data: {
               scrapedCount,
               scrapedUrls: results.map(r => r.url),
-              metadata: { savedCount } as any,
             }
           });
         }
@@ -538,7 +537,6 @@ export async function startScrapingJob(
         status: 'COMPLETED',
         completedAt: new Date(),
         scrapedCount,
-        metadata: { savedCount, totalProcessed: selectedUrls.length } as any,
       }
     });
 
