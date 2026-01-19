@@ -471,6 +471,10 @@ model Widget {
   allowedDomains String[] // Domain whitelist
   zIndex        Int       @default(999999)
   
+  // Sources Display
+  showSources      Boolean   @default(true)
+  maxVisibleSources Int      @default(3)
+  
   // Status
   isActive      Boolean   @default(true)
   installCode   String    @unique // Unique install code

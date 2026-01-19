@@ -1074,16 +1074,48 @@ export function generateWidgetScript(): string {
       'font-size: 14px; line-height: 1.5; word-wrap: break-word;';
     msgDiv.textContent = content;
     
-    if (!isUser && sources && sources.length > 0) {
+    if (!isUser && sources && sources.length > 0 && cfg.showSources !== false) {
+      const maxSources = cfg.maxVisibleSources || 3;
+      const visibleSources = sources.slice(0, maxSources);
+      
       const sourcesDiv = document.createElement('div');
-      sourcesDiv.style.cssText = 'margin-top: 8px; padding-top: 8px; border-top: 1px solid rgba(0,0,0,0.1); font-size: 11px; opacity: 0.8;';
-      sourcesDiv.innerHTML = '<strong>📚 Bronnen:</strong><br>' + sources.map(s => {
-        if (s.url) {
-          return '<a href="' + s.url + '" target="_blank" style="color: ' + cfg.bubbleBackgroundColor + '; text-decoration: underline;">' + (s.title || s.url) + '</a>';
-        }
-        return s.title || 'Knowledge Base';
-      }).join('<br>');
-      msgDiv.appendChild(sourcesDiv);
+      sourcesDiv.style.cssText = 'margin-top: 10px; padding-top: 8px; border-top: 1px solid rgba(0,0,0,0.05); display: flex; gap: 8px; flex-wrap: wrap; align-items: center;';
+      
+      // Filter valid sources and create elements
+      let hasValidSource = false;
+      visibleSources.forEach(s => {
+         const url = s.url || s.sourceUrl;
+         if (!url) return;
+         
+         try {
+           hasValidSource = true;
+           const urlObj = new URL(url);
+           const domain = urlObj.hostname;
+           const faviconUrl = 'https://www.google.com/s2/favicons?domain=' + domain + '&sz=64';
+           
+           const link = document.createElement('a');
+           link.href = url;
+           link.target = '_blank';
+           link.title = s.title || s.documentTitle || domain;
+           link.style.cssText = 'display: block; cursor: pointer; text-decoration: none; border-radius: 50%; transition: transform 0.2s;';
+           link.onmouseover = function() { this.style.transform = 'scale(1.15)'; };
+           link.onmouseout = function() { this.style.transform = 'scale(1)'; };
+           
+           const img = document.createElement('img');
+           img.src = faviconUrl;
+           img.alt = s.title || domain;
+           img.style.cssText = 'width: 24px; height: 24px; border-radius: 50%; border: 1px solid rgba(0,0,0,0.1); background: white; object-fit: cover; display: block;';
+           
+           link.appendChild(img);
+           sourcesDiv.appendChild(link);
+         } catch (e) {
+           console.error('AI Chat: Invalid source URL', url);
+         }
+      });
+      
+      if (hasValidSource) {
+        msgDiv.appendChild(sourcesDiv);
+      }
     }
     
     messagesContainer.appendChild(msgDiv);
@@ -1221,16 +1253,47 @@ export function generateWidgetScript(): string {
     msgDiv.textContent = content;
     
     // Add sources if available (for AI messages)
-    if (!isUser && sources && sources.length > 0) {
+    if (!isUser && sources && sources.length > 0 && cfg.showSources !== false) {
+      const maxSources = cfg.maxVisibleSources || 3;
+      const visibleSources = sources.slice(0, maxSources);
+      
       const sourcesDiv = document.createElement('div');
-      sourcesDiv.style.cssText = 'margin-top: 8px; padding-top: 8px; border-top: 1px solid rgba(0,0,0,0.1); font-size: 11px; opacity: 0.8;';
-      sourcesDiv.innerHTML = '<strong>📚 Bronnen:</strong><br>' + sources.map(s => {
-        if (s.url) {
-          return '<a href="' + s.url + '" target="_blank" style="color: ' + cfg.primaryColor + '; text-decoration: underline;">' + (s.title || s.url) + '</a>';
-        }
-        return s.title || 'Knowledge Base';
-      }).join('<br>');
-      msgDiv.appendChild(sourcesDiv);
+      sourcesDiv.style.cssText = 'margin-top: 10px; padding-top: 8px; border-top: 1px solid rgba(0,0,0,0.05); display: flex; gap: 8px; flex-wrap: wrap; align-items: center;';
+      
+      let hasValidSource = false;
+      visibleSources.forEach(s => {
+         const url = s.url || s.sourceUrl;
+         if (!url) return;
+         
+         try {
+           hasValidSource = true;
+           const urlObj = new URL(url);
+           const domain = urlObj.hostname;
+           const faviconUrl = 'https://www.google.com/s2/favicons?domain=' + domain + '&sz=64';
+           
+           const link = document.createElement('a');
+           link.href = url;
+           link.target = '_blank';
+           link.title = s.title || s.documentTitle || domain;
+           link.style.cssText = 'display: block; cursor: pointer; text-decoration: none; border-radius: 50%; transition: transform 0.2s;';
+           link.onmouseover = function() { this.style.transform = 'scale(1.15)'; };
+           link.onmouseout = function() { this.style.transform = 'scale(1)'; };
+           
+           const img = document.createElement('img');
+           img.src = faviconUrl;
+           img.alt = s.title || domain;
+           img.style.cssText = 'width: 24px; height: 24px; border-radius: 50%; border: 1px solid rgba(0,0,0,0.1); background: white; object-fit: cover; display: block;';
+           
+           link.appendChild(img);
+           sourcesDiv.appendChild(link);
+         } catch (e) {
+           console.error('AI Chat: Invalid source URL', url);
+         }
+      });
+      
+      if (hasValidSource) {
+        msgDiv.appendChild(sourcesDiv);
+      }
     }
     
     messagesContainer.appendChild(msgDiv);
