@@ -64,7 +64,7 @@ const browserPool = {
 
 /**
  * Heuristically determines if a URL is likely to be a content page.
- * This replaces all hardcoded lists of paths and file types.
+ * VERBETERD: Minder agressieve filtering om meer content te behouden
  * @param url The URL to check.
  * @param contentType The Content-Type header from the response (optional).
  * @returns True if the URL is likely a content page, false otherwise.
@@ -76,41 +76,58 @@ function isLikelyContentUrl(url: string, contentType?: string): boolean {
     const searchParams = parsedUrl.searchParams;
 
     // Rule 1: Skip non-HTML resources based on Content-Type
-    if (contentType && !contentType.includes('text/html')) {
+    if (contentType && !contentType.includes('text/html') && !contentType.includes('text/plain')) {
       return false;
     }
 
-    // Rule 2: Skip common asset/system paths (dynamically identified)
-    // This handles the "skip WP content" request by targeting system directories, not the content itself.
+    // Rule 2: Skip ALLEEN echte system/admin paths (niet content paden)
+    // VERBETERD: Minder agressief - 'static', 'assets', 'media' verwijderd want die kunnen content bevatten
     const systemKeywords = [
-      'admin', 'login', 'dashboard', 'panel', 'cpanel', 'wp-admin', 'wp-login', 'wp-content', 'wp-includes',
-      'node_modules', '.git', 'assets', 'static', 'media', 'cdn', 'api', 'rest', 'graphql', 'feed', 'rss',
-      'cgi-bin', 'ajax', 'service', 'services', 'download', 'file', 'files'
+      'wp-admin', 'wp-login', 'wp-includes', 'wp-json',  // WordPress admin
+      'admin', 'login', 'logout', 'signin', 'signup',     // Auth pages
+      'dashboard', 'panel', 'cpanel',                      // Admin panels
+      'node_modules', '.git', '.env',                      // Dev files
+      'cgi-bin', 'api/', 'rest/', 'graphql',              // API endpoints
+      'feed', 'rss', 'atom',                               // Feeds
+      'cart', 'checkout', 'payment',                       // E-commerce
+      'search?', 'ajax', 'action='                         // Dynamic endpoints
     ];
-    if (systemKeywords.some(keyword => path.includes(`/${keyword}/`) || path.endsWith(`/${keyword}`))) {
-      return false;
+
+    for (const keyword of systemKeywords) {
+      if (path.includes(`/${keyword}`) || path.includes(`${keyword}/`) || path.endsWith(`/${keyword}`)) {
+        return false;
+      }
     }
 
-    // Rule 3: Skip URLs with file extensions that are not pages
-    // This is a heuristic based on common patterns, not a hardcoded list.
+    // Rule 3: Skip URLs with file extensions that are definitely not pages
     if (path.includes('.')) {
       const extension = path.split('.').pop();
       const nonPageExtensions = [
-        'jpg', 'jpeg', 'png', 'gif', 'svg', 'webp', // Images
-        'css', // Stylesheets
-        'js', 'mjs', // JavaScript
+        'jpg', 'jpeg', 'png', 'gif', 'svg', 'webp', 'ico', 'bmp', // Images
+        'css', 'scss', 'less',     // Stylesheets
+        'js', 'mjs', 'ts', 'jsx',  // JavaScript
         'pdf', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx', // Documents
-        'zip', 'rar', 'tar', 'gz', // Archives
-        'mp3', 'wav', 'ogg', 'mp4', 'avi', 'mov', // Media
-        'xml', 'txt', 'log', 'ico' // Misc data/files
+        'zip', 'rar', 'tar', 'gz', '7z', // Archives
+        'mp3', 'wav', 'ogg', 'mp4', 'avi', 'mov', 'webm', // Media
+        'xml', 'json', 'txt', 'log', 'csv', // Data files
+        'woff', 'woff2', 'ttf', 'otf', 'eot', // Fonts
+        'map' // Source maps
       ];
       if (nonPageExtensions.includes(extension || '')) {
         return false;
       }
     }
 
-    // Rule 4: Skip URLs that look like AJAX calls or have complex query strings for actions
-    if (searchParams.has('action') || searchParams.has('ajax') || searchParams.has('format') && searchParams.get('format') !== 'html') {
+    // Rule 4: Skip URLs with specific action parameters (MINDER agressief)
+    const skipParams = ['action', 'ajax', 'callback', 'jsonp'];
+    for (const param of skipParams) {
+      if (searchParams.has(param)) {
+        return false;
+      }
+    }
+
+    // Rule 5: Skip URLs die te veel query parameters hebben (waarschijnlijk geen content)
+    if (Array.from(searchParams.keys()).length > 5) {
       return false;
     }
 
@@ -123,55 +140,189 @@ function isLikelyContentUrl(url: string, contentType?: string): boolean {
 
 /**
  * Dynamically extracts the main content from a page without hardcoded selectors.
- * It uses heuristics to find the largest, most relevant text block.
+ * VERBETERD: Minder agressieve filtering, betere tekst opschoning, meer content behoud
  * @param $ The Cheerio instance of the page.
  * @returns The extracted title, description, and main content.
  */
 function dynamicExtractContent($: cheerio.CheerioAPI): { title: string; content: string; description: string } {
-  // Remove boilerplate elements that are unlikely to contain main content.
-  // This is a heuristic based on common HTML patterns.
-  $('nav, header, footer, script, style, link, meta, noscript, .ad, .ads, .advertisement, .sidebar, .menu, .nav').remove();
+  // Maak een kopie zodat we de originele DOM niet wijzigen
+  const $clone = cheerio.load($.html());
+
+  // Verwijder ALLEEN echte boilerplate elementen (geen header/nav want die kunnen nuttige info bevatten)
+  $clone('script, style, link, meta, noscript, iframe, .ad, .ads, .advertisement, .cookie-banner, .popup, .modal').remove();
+  // Verwijder hidden elementen
+  $clone('[style*="display: none"], [style*="display:none"], [hidden]').remove();
 
   // Extract title
-  let title = $('title').text().trim() || $('h1').first().text().trim() || 'Untitled';
-  title = title.substring(0, 200);
+  let title = $clone('title').text().trim() ||
+    $clone('h1').first().text().trim() ||
+    $clone('meta[property="og:title"]').attr('content') ||
+    'Untitled';
+  title = cleanText(title).substring(0, 200);
 
   // Extract description
-  let description = $('meta[name="description"]').attr('content') || $('meta[property="og:description"]').attr('content') || '';
-  description = description.substring(0, 300);
+  let description = $clone('meta[name="description"]').attr('content') ||
+    $clone('meta[property="og:description"]').attr('content') || '';
+  description = cleanText(description).substring(0, 500);
 
-  // Heuristic: Find the parent element with the highest text-to-HTML ratio.
-  // This is a strong indicator of the main content area.
-  let bestElement = $('body');
-  let maxRatio = 0;
+  // NIEUWE AANPAK: Verzamel content uit specifieke semantische elementen
+  const contentParts: string[] = [];
 
-  const potentialContentContainers = $('main, article, section, div, p');
-  potentialContentContainers.each((i, el) => {
-    const $el = $(el);
-    const text = $el.text().trim();
-    if (text.length < 100) return; // Ignore small elements
-
-    const html = $el.html() || '';
-    // Avoid division by zero
-    const ratio = html.length > 0 ? text.length / html.length : 0;
-
-    if (ratio > maxRatio && text.length > bestElement.text().trim().length * 0.5) {
-      maxRatio = ratio;
-      bestElement = $el;
+  // 1. Voeg headers toe (belangrijk voor context)
+  $clone('h1, h2, h3, h4, h5, h6').each((_, el) => {
+    const text = $clone(el).text().trim();
+    if (text.length > 3) {
+      contentParts.push(`\n## ${text}\n`);
     }
   });
 
-  let content = bestElement.text().trim();
+  // 2. Probeer de main content area te vinden
+  const mainContentSelectors = [
+    'main', 'article', '[role="main"]', '.content', '.main-content',
+    '#content', '#main', '.post-content', '.entry-content', '.page-content',
+    '.article-body', '.post-body', '.text-content'
+  ];
 
-  // Fallback if the heuristic fails (e.g., on very simple pages)
-  if (content.length < 200) {
-    content = $('body').text().trim();
+  let mainContent = '';
+  for (const selector of mainContentSelectors) {
+    const $main = $clone(selector);
+    if ($main.length > 0) {
+      mainContent = $main.first().text().trim();
+      if (mainContent.length > 200) {
+        logger.info('Found main content using selector', { selector, length: mainContent.length });
+        break;
+      }
+    }
   }
 
-  // Limit content length for performance
-  content = content.substring(0, 10000);
+  // 3. Heuristic fallback: vind het element met de meeste tekst
+  if (mainContent.length < 200) {
+    let bestElement = $clone('body');
+    let maxLength = 0;
+
+    $clone('main, article, section, div').each((_, el) => {
+      const $el = $clone(el);
+      const text = $el.text().trim();
+      const html = $el.html() || '';
+
+      // Check text-to-HTML ratio voor kwaliteit
+      const ratio = html.length > 0 ? text.length / html.length : 0;
+
+      // Prefereer elementen met goede ratio EN veel tekst
+      if (text.length > maxLength && ratio > 0.1) {
+        maxLength = text.length;
+        bestElement = $el;
+      }
+    });
+
+    mainContent = bestElement.text().trim();
+  }
+
+  // 4. Voeg paragraph tekst toe voor extra context
+  const paragraphs: string[] = [];
+  $clone('p').each((_, el) => {
+    const text = $clone(el).text().trim();
+    if (text.length > 30) { // Alleen zinvolle paragraphs
+      paragraphs.push(text);
+    }
+  });
+
+  // 5. Voeg lijsten toe (vaak belangrijke informatie)
+  $clone('ul, ol').each((_, el) => {
+    const $list = $clone(el);
+    const items: string[] = [];
+    $list.find('li').each((_, li) => {
+      const text = $clone(li).text().trim();
+      if (text.length > 5) {
+        items.push(`• ${text}`);
+      }
+    });
+    if (items.length > 0) {
+      paragraphs.push(items.join('\n'));
+    }
+  });
+
+  // 6. Voeg tabellen toe (als markdown) - ALWAYS append these
+  const tables: string[] = [];
+  $clone('table').each((_, el) => {
+    const $table = $clone(el);
+    const rows: string[] = [];
+
+    // Process headers
+    const headers: string[] = [];
+    $table.find('th').each((_, th) => {
+      headers.push($clone(th).text().trim());
+    });
+
+    if (headers.length > 0) {
+      rows.push(`| ${headers.join(' | ')} |`);
+      rows.push(`| ${headers.map(() => '---').join(' | ')} |`);
+    }
+
+    // Process rows
+    $table.find('tr').each((_, tr) => {
+      const cells: string[] = [];
+      $clone(tr).find('td').each((_, td) => {
+        cells.push($clone(td).text().trim());
+      });
+      if (cells.length > 0) {
+        if (rows.length === 0) {
+          // Treating as data
+        }
+        rows.push(`| ${cells.join(' | ')} |`);
+      }
+    });
+
+    if (rows.length > 0) {
+      tables.push(`\n${rows.join('\n')}\n`);
+    }
+  });
+
+  // Combineer alle content
+  let content = mainContent;
+
+  // Als de main content kort is, voeg paragraphs toe
+  if (content.length < 500) {
+    content = paragraphs.join('\n\n'); // Paragraphs include lists
+  }
+
+  // ALTIJD tabellen toevoegen als ze er zijn en niet al in de text zitten (simple check)
+  // We voegen ze toe aan het einde voor de zekerheid
+  if (tables.length > 0) {
+    content += "\n\n" + tables.join("\n\n");
+  }
+
+  // Als er nog steeds weinig content is, gebruik body als fallback
+  if (content.length < 100) {
+    content = $clone('body').text().trim();
+  }
+
+  // Schoon de content op
+  content = cleanText(content);
+
+  // VERHOOGDE limiet: 50.000 karakters voor meer uitgebreide content
+  content = content.substring(0, 50000);
+
+  logger.info('Content extracted', {
+    titleLength: title.length,
+    descriptionLength: description.length,
+    contentLength: content.length
+  });
 
   return { title, content, description };
+}
+
+/**
+ * Schoont tekst op: verwijdert extra witruimte, normaliseert, etc.
+ */
+function cleanText(text: string): string {
+  return text
+    .replace(/\s+/g, ' ')           // Normaliseer witruimte
+    .replace(/\n\s*\n/g, '\n\n')    // Max 2 newlines
+    .replace(/\t/g, ' ')            // Tabs naar spaties
+    .replace(/\u00A0/g, ' ')        // Non-breaking spaces
+    .replace(/\s{2,}/g, ' ')        // Dubbele spaties
+    .trim();
 }
 
 
@@ -206,47 +357,70 @@ export async function scrapeWebsite(
 
     const response = await page.goto(url, {
       waitUntil: 'domcontentloaded',
-      timeout: 15000
+      timeout: 20000 // Verhoogd timeout
     });
 
     // Check if the page is actually HTML before proceeding
     const contentType = response?.headers()['content-type'] || '';
     if (!isLikelyContentUrl(url, contentType)) {
       logger.info('Skipping non-content page', { url, reason: 'Content-Type check' });
-      return null; // Return null to indicate this page should be ignored
+      return null;
     }
 
-    // Wait a bit for dynamic content to load
-    await new Promise(resolve => setTimeout(resolve, 2000));
+    // VERBETERD: Meerdere scroll acties voor lazy-loaded content
+    // Wacht eerst even voor initiele content
+    await new Promise(resolve => setTimeout(resolve, 1500));
 
-    // Trigger lazy loading by scrolling
-    await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
-    await new Promise(resolve => setTimeout(resolve, 1000));
+    // Scroll in stappen om lazy loading te triggeren
+    await page.evaluate(async () => {
+      const scrollStep = window.innerHeight;
+      const maxScroll = document.body.scrollHeight;
+
+      for (let pos = 0; pos < maxScroll; pos += scrollStep) {
+        window.scrollTo(0, pos);
+        await new Promise(r => setTimeout(r, 200));
+      }
+      // Scroll naar beneden en dan terug naar boven
+      window.scrollTo(0, document.body.scrollHeight);
+      await new Promise(r => setTimeout(r, 500));
+      window.scrollTo(0, 0);
+    });
+
+    // Wacht op lazy-loaded content
+    await new Promise(resolve => setTimeout(resolve, 1500));
 
     const html = await page.content();
     const $ = cheerio.load(html);
 
     const { title, content, description } = dynamicExtractContent($);
 
-    if (!content || content.length < 50) {
-      logger.warn('Page has very little content, skipping', { url });
+    // VERLAAGD: minimum content van 50 naar 20 karakters
+    if (!content || content.length < 20) {
+      logger.warn('Page has very little content, skipping', { url, contentLength: content?.length || 0 });
       return null;
     }
 
     const hash = crypto.createHash('md5').update(url + content.substring(0, 100)).digest('hex');
 
+    // VERBETERD: Meer metadata extractie
     const result = {
       url,
       title,
       description,
-      mainImage: $('meta[property="og:image"]').attr('content') || '',
+      mainImage: $('meta[property="og:image"]').attr('content') ||
+        $('meta[name="twitter:image"]').attr('content') ||
+        $('img').first().attr('src') || '',
+      author: $('meta[name="author"]').attr('content') ||
+        $('meta[property="article:author"]').attr('content') || '',
+      publishDate: $('meta[property="article:published_time"]').attr('content') ||
+        $('time').first().attr('datetime') || '',
       content,
       scrapedAt: new Date(),
       hash,
     };
 
     const duration = Date.now() - startTime;
-    logger.info('Scraping completed', { url, duration, contentLength: content.length });
+    logger.info('Scraping completed', { url, duration, contentLength: content.length, title });
 
     return result;
 

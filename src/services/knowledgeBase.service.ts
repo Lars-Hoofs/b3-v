@@ -249,19 +249,150 @@ function splitTextIntoChunks(
   overlap: number
 ): Array<{ text: string; startChar: number; endChar: number }> {
   const chunks: Array<{ text: string; startChar: number; endChar: number }> = [];
-  let start = 0;
 
-  while (start < text.length) {
-    const end = Math.min(start + chunkSize, text.length);
-    const chunkText = text.slice(start, end);
+  // Recursive character splitter implementation
+  // We explicitly want to split on these separators in order of precedence
+  const separators = ["\n\n", "\n", ". ", "! ", "? ", ";", ":", " ", ""];
 
+  function splitRecursive(
+    currentText: string,
+    currentStartOffset: number
+  ): void {
+    const length = currentText.length;
+
+    // If text fits in a chunk, just add it
+    if (length <= chunkSize) {
+      if (length > 0) {
+        chunks.push({
+          text: currentText,
+          startChar: currentStartOffset,
+          endChar: currentStartOffset + length
+        });
+      }
+      return;
+    }
+
+    // Otherwise, we leverage separators to find the best split point
+    let bestSplitIndex = -1;
+    let separatorUsed = '';
+
+    for (const separator of separators) {
+      if (separator === "") {
+        // If we get to the empty separator, we just hard split at chunkSize
+        bestSplitIndex = chunkSize;
+        separatorUsed = "";
+        break;
+      }
+
+      // Find the last occurrence of the separator within the chunkSize limit
+      // We want to maximize the chunk size while respecting semantic boundaries
+      const firstPart = currentText.substring(0, chunkSize + separator.length); // look a bit past to find the separator
+      const lastIndex = firstPart.lastIndexOf(separator);
+
+      if (lastIndex !== -1 && lastIndex < chunkSize) {
+        bestSplitIndex = lastIndex;
+        separatorUsed = separator;
+        break;
+      }
+    }
+
+    // If for some reason we couldn't find a split (shouldn't happen with "" separator), force split
+    if (bestSplitIndex === -1) {
+      bestSplitIndex = chunkSize;
+    }
+
+    // Add the first part
+    const chunkText = currentText.substring(0, bestSplitIndex + separatorUsed.length);
     chunks.push({
       text: chunkText,
-      startChar: start,
-      endChar: end,
+      startChar: currentStartOffset,
+      endChar: currentStartOffset + chunkText.length
     });
 
-    start += chunkSize - overlap;
+    // Calculate overlap start for the next chunk
+    // We want the next chunk to include some of the previous text for context
+    let nextStartInCurrent = bestSplitIndex + separatorUsed.length;
+
+    // Apply overlap by backtracking, but try to respect boundaries again?
+    // For simplicity in this robust implementation, we just effectively shift the window
+    // However, true overlap means we need to "unread" some characters or just send the rest
+    // Standard recursive splitters usually just recurse on the rest.
+    // To support overlap, we actually need a sliding window approach.
+
+    // Let's switch to a simpler Sliding Window approach with Semantic boundaries which is more robust for RAG.
+  }
+
+  // --- Better Sliding Window Implementation ---
+
+  let currentStart = 0;
+
+  while (currentStart < text.length) {
+    // 1. Determine potential end based on chunkSize
+    let potentialEnd = Math.min(currentStart + chunkSize, text.length);
+    let chunkEnd = potentialEnd;
+
+    // 2. If we are not at the end of the text, try to walk back to the nearest separator
+    if (chunkEnd < text.length) {
+      let foundSeparator = false;
+      for (const sep of separators) {
+        if (sep === "") continue;
+
+        // Search backwards from potentialEnd
+        // We look back up to 'overlap' distance or reasonable amount to find a break
+        const searchWindow = text.substring(Math.max(currentStart, potentialEnd - 100), potentialEnd + sep.length);
+        const lastIndexOfSep = searchWindow.lastIndexOf(sep);
+
+        if (lastIndexOfSep !== -1) {
+          // Adjust position relative to original text
+          const relativeIndex = Math.max(currentStart, potentialEnd - 100) + lastIndexOfSep + sep.length;
+          if (relativeIndex > currentStart && relativeIndex <= potentialEnd + sep.length) {
+            chunkEnd = relativeIndex;
+            foundSeparator = true;
+            break;
+          }
+        }
+      }
+    }
+
+    const chunkText = text.slice(currentStart, chunkEnd);
+    chunks.push({
+      text: chunkText,
+      startChar: currentStart,
+      endChar: chunkEnd
+    });
+
+    // 3. Move start pointer forward, considering overlap
+    // New start should be (currentEnd - overlap)
+    // BUT we should also try to align the NEW start with a semantic boundary so we don't start in the middle of a word
+
+    if (chunkEnd >= text.length) break;
+
+    let nextStart = chunkEnd - overlap;
+
+    // If overlap brings us back before currentStart, force forward progress
+    if (nextStart <= currentStart) {
+      nextStart = currentStart + Math.floor(chunkSize / 2);
+    }
+
+    // Refine nextStart: try to find a sentence/word boundary *before* the calculated nextStart
+    // to ensure the overlap creates a clean start for the next chunk
+    let refinedNextStart = nextStart;
+    const lookbackRange = 50; // Text to look at around the overlap point
+    const overlapWindow = text.substring(Math.max(0, nextStart - lookbackRange), Math.min(text.length, nextStart + lookbackRange));
+
+    // Try to find a sentence break near the overlap point
+    for (const sep of ["\n\n", "\n", ". ", "? ", "! "]) {
+      const idx = overlapWindow.indexOf(sep);
+      if (idx !== -1) {
+        // Calculate absolute position
+        const absIndex = Math.max(0, nextStart - lookbackRange) + idx + sep.length;
+        // Ideally we want the start to be as close to 'nextStart' as possible, or slightly before
+        // This is a heuristic. Simpler is just to stick to the hard overlap or standard slicing.
+        // Let's simple-slide for now, the "End" optimization is the most important for reading quality.
+      }
+    }
+
+    currentStart = nextStart;
   }
 
   return chunks;

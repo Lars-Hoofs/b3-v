@@ -81,7 +81,7 @@ export async function startConversation(input: StartConversationInput) {
         conversationId: conversation.id,
         workflowId: conversation.agent.workflowId,
       });
-      
+
       await workflowExecutor.initializeWorkflowForConversation(
         conversation.id,
         conversation.agent.workflowId,
@@ -91,7 +91,7 @@ export async function startConversation(input: StartConversationInput) {
           source: conversation.source,
         }
       );
-      
+
       logger.info('Workflow initialized successfully', {
         conversationId: conversation.id,
         workflowId: conversation.agent.workflowId,
@@ -154,7 +154,7 @@ export async function getConversationMessages(
   pageSize: number = 50
 ) {
   const skip = (page - 1) * pageSize;
-  
+
   const [messages, total] = await Promise.all([
     prisma.message.findMany({
       where: { conversationId },
@@ -209,7 +209,7 @@ export async function sendMessage(input: SendMessageInput) {
     if (!conversation.assignedToId) {
       throw new ChatError("You must be assigned to this conversation before sending messages", 403);
     }
-    
+
     // Check if the sender is the assigned agent
     if (input.senderId && conversation.assignedToId !== input.senderId) {
       throw new ChatError("Only the assigned agent can send messages to this conversation", 403);
@@ -226,7 +226,7 @@ export async function sendMessage(input: SendMessageInput) {
       metadata: input.currentPageUrl ? { currentPageUrl: input.currentPageUrl } : null,
     },
   });
-  
+
   // Debug: Log URL storage
   if (input.currentPageUrl) {
     console.log('🌐 Stored currentPageUrl:', input.currentPageUrl, 'for conversation:', conversation.id);
@@ -262,16 +262,16 @@ export async function sendMessage(input: SendMessageInput) {
 
   // Check if user is requesting a human agent
   const isRequestingHuman = detectHumanAgentRequest(input.content);
-  
+
   if (isRequestingHuman) {
     logger.info('User requesting human agent', { conversationId: conversation.id });
-    
+
     // Check availability
     const availability = await checkAgentAvailability(
       conversation.workspaceId,
       conversation.widgetId
     );
-    
+
     if (!availability.available) {
       // No agents available - send configured message
       const offlineMessage = await prisma.message.create({
@@ -282,26 +282,26 @@ export async function sendMessage(input: SendMessageInput) {
           metadata: { source: "agent_unavailable", reason: availability.reason },
         },
       });
-      
+
       socketService.broadcastMessage(conversation.id, offlineMessage);
       return { userMessage, aiMessage: offlineMessage };
     } else {
       // Agents are available - mark conversation as WAITING and notify agents
       await prisma.conversation.update({
         where: { id: conversation.id },
-        data: { 
+        data: {
           status: "WAITING",
           visibleInDashboard: true // Make visible when human agent is requested
         },
       });
-      
+
       // Notify all online agents in the workspace via Socket.io
       socketService.notifyHumanAgentRequested(conversation.workspaceId, {
         conversationId: conversation.id,
         visitorName: conversation.visitorName || "Anonymous",
         lastMessage: input.content,
       });
-      
+
       // Send message to user
       const notificationMessage = await prisma.message.create({
         data: {
@@ -311,9 +311,9 @@ export async function sendMessage(input: SendMessageInput) {
           metadata: { source: "agent_connecting" },
         },
       });
-      
+
       socketService.broadcastMessage(conversation.id, notificationMessage);
-      
+
       // Send webhook
       await webhookService.sendWebhook(
         conversation.workspaceId,
@@ -324,11 +324,11 @@ export async function sendMessage(input: SendMessageInput) {
           lastMessage: input.content,
         }
       );
-      
+
       return { userMessage, aiMessage: notificationMessage };
     }
   }
-  
+
   // If human agent has taken over, don't generate AI response for customer messages
   if (conversation.assignedToId) {
     return { userMessage, aiMessage: null };
@@ -341,20 +341,20 @@ export async function sendMessage(input: SendMessageInput) {
       conversationId: conversation.id,
       workflowId: conversation.agent.workflowId,
     });
-    
+
     let workflowResult = await workflowExecutor.handleMessageInWorkflow(
       conversation.id,
       input.content,
       { currentPageUrl: input.currentPageUrl }
     );
-    
+
     // If workflow returned null but workflow should be running, try to reinitialize
     if (workflowResult === null) {
       logger.warn('Workflow returned null - attempting recovery', {
         conversationId: conversation.id,
         workflowId: conversation.agent.workflowId,
       });
-      
+
       try {
         await workflowExecutor.initializeWorkflowForConversation(
           conversation.id,
@@ -366,11 +366,11 @@ export async function sendMessage(input: SendMessageInput) {
             recoveryMode: true,
           }
         );
-        
+
         logger.info('Workflow recovery successful, retrying message', {
           conversationId: conversation.id,
         });
-        
+
         // Try again with newly initialized workflow
         workflowResult = await workflowExecutor.handleMessageInWorkflow(
           conversation.id,
@@ -417,7 +417,7 @@ export async function sendMessage(input: SendMessageInput) {
         metadata: { source: "competitor_block" },
       },
     });
-    
+
     socketService.broadcastMessage(conversation.id, competitorBlockMessage);
     return { userMessage, aiMessage: competitorBlockMessage };
   }
@@ -444,7 +444,7 @@ async function generateAIResponse(conversation: any, userMessage: string, curren
     // Get page-specific context if user is on a specific page
     let pageContext = "";
     let pageSources: any[] = [];
-    
+
     if (currentPageUrl && agent.knowledgeBaseId) {
       const { getPageContext } = await import("./scraper.service");
       try {
@@ -457,19 +457,21 @@ async function generateAIResponse(conversation: any, userMessage: string, curren
         console.error("Page context error:", error);
       }
     }
-    
+
     // Search knowledge base if agent has one
     let kbContext = "";
     let kbSources: any[] = [];
-    
+
     if (agent.knowledgeBaseId) {
       const { searchKnowledgeBase } = await import("./knowledgeBase.service");
       try {
-        const results = await searchKnowledgeBase(agent.knowledgeBaseId, userMessage, 3);
+        // INCREASED LIMIT for "Super System" - extensive context retrieval
+        const results = await searchKnowledgeBase(agent.knowledgeBaseId, userMessage, 10);
         if (results.length > 0) {
-          kbContext = "\n\nRelevant information from knowledge base:\n" + 
-            results.map((r, i) => `Source ${i + 1}: ${r.content}`).join("\n");
-          
+          kbContext = "\n\n=== RELEVANT KNOWLEDGE BASE INFORMATION ===\n" +
+            results.map((r, i) => `[Source ${i + 1}] (Title: ${r.documentTitle}): ${r.content}`).join("\n\n") +
+            "\n===========================================\n";
+
           // Extract sources with URLs
           kbSources = results.map((r, i) => ({
             id: i + 1,
@@ -485,9 +487,19 @@ async function generateAIResponse(conversation: any, userMessage: string, curren
     }
 
     // Build conversation history with page and KB context
-    const systemPrompt = agent.systemPrompt + pageContext + kbContext + 
-      "\n\nIMPORTANT: When answering, if you use information from the sources, mention which source you used (e.g., 'According to the current page...' or 'Based on Source 1...')";
-    
+    // STRICT ANTI-HALLUCINATION DIRECTIVES
+    const additionalDirectives =
+      "\n\n*** STRICT INSTRUCTIONS FOR AI ***\n" +
+      "1. You are a knowledgeable support assistant. You have access to the 'Relevant Knowledge Base Information' above.\n" +
+      "2. GROUNDING RULES (CRITICAL):\n" +
+      "   - You must answer the user's question using ONLY the provided context.\n" +
+      "   - If the answer is explicitly found in the context, provide it clearly.\n" +
+      "   - If the answer is NOT found in the context, admit you don't know. Do NOT make up information or use outside knowledge to fill gaps about the specific business/product.\n" +
+      "   - Citation: When you use a specific piece of information, mentally cite it. If strictly asked for sources, you can refer to the titles.\n" +
+      "   - Tone: Be helpful, professional, and confident, even when saying you don't know.\n";
+
+    const systemPrompt = agent.systemPrompt + pageContext + kbContext + additionalDirectives;
+
     const messages: any[] = [
       {
         role: "system",
@@ -745,7 +757,7 @@ export async function getWorkspaceConversations(
   return conversations.map(conv => {
     let currentPageUrl = null;
     const lastMessage = conv.messages[0]; // First message in desc order = most recent
-    
+
     // Find the most recent message with a URL (check all messages)
     for (const message of conv.messages) {
       if (message.role === 'USER' && message.metadata && typeof message.metadata === 'object') {
@@ -757,7 +769,7 @@ export async function getWorkspaceConversations(
         }
       }
     }
-    
+
     return {
       ...conv,
       currentPageUrl,
@@ -778,7 +790,7 @@ export async function getWorkspaceConversations(
  */
 function detectHumanAgentRequest(message: string): boolean {
   const lowerMessage = message.toLowerCase();
-  
+
   const patterns = [
     // Dutch
     /\b(wil|kan|mag)\s+(ik\s+)?(graag\s+)?(met\s+)?(een\s+)?medewerker\b/i,
@@ -796,7 +808,7 @@ function detectHumanAgentRequest(message: string): boolean {
     /\btransfer\s+(me\s+)?(to|with)\s+(a\s+)?(human|agent)\b/i,
     /\bcustomer\s+(service|support)\b/i,
   ];
-  
+
   return patterns.some(pattern => pattern.test(lowerMessage));
 }
 
@@ -805,7 +817,7 @@ function detectHumanAgentRequest(message: string): boolean {
  */
 function detectCompetitorQuestion(message: string): boolean {
   const lowerMessage = message.toLowerCase();
-  
+
   const patterns = [
     // Dutch
     /\bconcurrent(en|ie)?\b/i,
@@ -823,7 +835,7 @@ function detectCompetitorQuestion(message: string): boolean {
     /\bvs\b/i,
     /\bversus\b/i,
   ];
-  
+
   return patterns.some(pattern => pattern.test(lowerMessage));
 }
 
@@ -847,10 +859,10 @@ async function checkAgentAvailability(
       },
     });
   }
-  
+
   // Check AI-only mode
   if (widget?.aiOnlyMode) {
-    const message = (widget.aiOnlyMessage as any)?.nl || 
+    const message = (widget.aiOnlyMessage as any)?.nl ||
       "Sorry, op dit moment zijn er geen medewerkers beschikbaar. Ik help je graag verder!";
     return {
       available: false,
@@ -858,13 +870,13 @@ async function checkAgentAvailability(
       message,
     };
   }
-  
+
   // Check holidays
   if (widget?.holidays) {
     const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
     const holidays = widget.holidays as any[];
     const isHoliday = holidays.some((h: any) => h.date === today);
-    
+
     if (isHoliday) {
       return {
         available: false,
@@ -873,17 +885,17 @@ async function checkAgentAvailability(
       };
     }
   }
-  
+
   // Check working hours
   if (widget?.workingHours) {
     const now = new Date();
     const dayNames = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
     const currentDay = dayNames[now.getDay()];
     const currentTime = now.toTimeString().slice(0, 5); // HH:MM format
-    
+
     const workingHours = widget.workingHours as any;
     const todayHours = workingHours[currentDay];
-    
+
     if (!todayHours?.enabled || currentTime < todayHours.start || currentTime > todayHours.end) {
       return {
         available: false,
@@ -892,10 +904,10 @@ async function checkAgentAvailability(
       };
     }
   }
-  
+
   // Check if there are online agents
   const onlineCount = await presenceService.getWorkspaceOnlineCount(workspaceId);
-  
+
   if (onlineCount === 0) {
     return {
       available: false,
@@ -903,7 +915,7 @@ async function checkAgentAvailability(
       message: "Sorry, er zijn momenteel geen medewerkers online. Ik help je graag verder!",
     };
   }
-  
+
   return {
     available: true,
     message: "Een medewerker neemt zo contact met je op.",
