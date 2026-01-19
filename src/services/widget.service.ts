@@ -1427,8 +1427,8 @@ function appendMessage(content, isUser, cfg, sources) {
     ((isUser && (cfg.userMessageColor === '#ffffff' || cfg.userMessageColor === '#fff')) ? 'box-shadow: 0 2px 8px rgba(0,0,0,0.04); border: 1px solid rgba(0,0,0,0.04); ' : '') +
     'animation: slideIn 0.3s cubic-bezier(0.2, 0.8, 0.2, 1);';
     
-  // Handle newlines
-  msgDiv.innerHTML = content.replace(/\n/g, '<br>');
+  // Handle newlines - use new RegExp to avoid issues with stringification
+  msgDiv.innerHTML = content.replace(new RegExp('\\n', 'g'), '<br>');
 
   // Add sources if available (for AI messages)
   if (!isUser && sources && sources.length > 0 && cfg.showSources !== false) {
