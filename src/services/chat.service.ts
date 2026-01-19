@@ -495,7 +495,7 @@ async function generateAIResponse(conversation: any, userMessage: string, curren
       "   - You must answer the user's question using ONLY the provided context.\n" +
       "   - If the answer is explicitly found in the context, provide it clearly.\n" +
       "   - If the answer is NOT found in the context, admit you don't know. Do NOT make up information or use outside knowledge to fill gaps about the specific business/product.\n" +
-      "   - Citation: When you use a specific piece of information, mentally cite it. If strictly asked for sources, you can refer to the titles.\n" +
+      "   - Citation: Do NOT include citations like '[Source 1]' or '(Source 1)' in your response text. The sources are automatically displayed to the user in the interface.\n" +
       "   - Tone: Be helpful, professional, and confident, even when saying you don't know.\n";
 
     const systemPrompt = agent.systemPrompt + pageContext + kbContext + additionalDirectives;
