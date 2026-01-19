@@ -549,7 +549,7 @@ export function generateWidgetScript(): string {
         // Normal popup for bubble and custom-box
         chatWindow.style.display = 'flex';
         bubble.style.display = 'none';
-        applyOpenAnimation(chatWindow, cfg.openAnimation);
+        applyOpenAnimation(chatWindow, cfg.chatAnimation);
         initializeChat(cfg, apiUrl);
       }
     });
@@ -591,6 +591,7 @@ export function generateWidgetScript(): string {
     }
   }
   
+
   function getBubbleStyles(cfg) {
     let size = { width: 64, height: 64 };
     if (cfg.bubbleSize === 'small') size = { width: 48, height: 48 };
@@ -599,739 +600,867 @@ export function generateWidgetScript(): string {
       size = { width: cfg.bubbleWidth, height: cfg.bubbleHeight };
     }
     
-    let borderRadius = '50%';
+    // Width might be variable if we have text-only or side-by-side
+    let widthStr = size.width + 'px';
+    let heightStr = size.height + 'px';
+    let borderRadius = '50%'; // Default circle
+
     if (cfg.bubbleShape === 'square') borderRadius = '0';
     if (cfg.bubbleShape === 'rounded-square') borderRadius = '16px';
     
-    // Create hover styles if configured
+    // Auto-width for side-by-side or text-only
+    if ((cfg.bubbleText && !cfg.bubbleIcon && !cfg.bubbleImageUrl) || (cfg.imageIconRelation === 'side-by-side')) {
+      widthStr = 'auto';
+      borderRadius = '32px'; // Pill shape
+    }
+
+    // Determine Background (Gradient vs Solid)
+    let background = cfg.bubbleBackgroundColor;
+    if (cfg.backgroundGradient && cfg.backgroundGradient.from && cfg.backgroundGradient.to) {
+       const { from, to, direction } = cfg.backgroundGradient;
+       background = \`linear-gradient(\${direction || 'to-br'}, \${from}, \${to})\`;
+    }
+    
+    // Glass Effect
+    let glassEffectCss = '';
+    if (cfg.glassEffect) {
+       const blur = cfg.backdropBlur || 8;
+       glassEffectCss = \`backdrop-filter: blur(\${blur}px); -webkit-backdrop-filter: blur(\${blur}px); border: 1px solid rgba(255, 255, 255, 0.2);\`;
+    }
+
+    // Create hover styles
     const bubbleId = 'ai-chat-bubble';
-    if (cfg.bubbleHoverBackgroundColor || cfg.bubbleHoverTextColor || cfg.bubbleHoverIconColor || cfg.bubbleHoverScale) {
-      const hoverStyle = document.createElement('style');
-      let hoverCss = '#' + bubbleId + ':hover { ';
-      if (cfg.bubbleHoverBackgroundColor) hoverCss += 'background: ' + cfg.bubbleHoverBackgroundColor + ' !important; ';
-      if (cfg.bubbleHoverScale) hoverCss += 'transform: scale(' + cfg.bubbleHoverScale + ') !important; ';
-      hoverCss += '} ';
-      if (cfg.bubbleHoverTextColor) hoverCss += '#' + bubbleId + ':hover .ai-bubble-text { color: ' + cfg.bubbleHoverTextColor + ' !important; } ';
-      if (cfg.bubbleHoverIconColor) hoverCss += '#' + bubbleId + ':hover .ai-bubble-icon { color: ' + cfg.bubbleHoverIconColor + ' !important; } ';
-      hoverStyle.textContent = hoverCss;
-      document.head.appendChild(hoverStyle);
+    const hoverStyle = document.createElement('style');
+    let hoverCss = \`#\${bubbleId}:hover { \`;
+    
+    if (cfg.bubbleHoverBackgroundColor) {
+      hoverCss += \`background: \${cfg.bubbleHoverBackgroundColor} !important; \`;
     }
     
-    return 'width: ' + size.width + 'px; ' +
-           'height: ' + size.height + 'px; ' +
-           'background: ' + cfg.bubbleBackgroundColor + '; ' +
-           'color: ' + cfg.bubbleTextColor + '; ' +
-           'border-radius: ' + borderRadius + '; ' +
-           'display: flex; align-items: center; justify-content: center; ' +
-           'cursor: pointer; ' +
-           'box-shadow: ' + (cfg.bubbleShadow || '0 8px 24px rgba(0,0,0,0.12), 0 2px 8px rgba(0,0,0,0.08)') + '; ' +
-           'transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.2s, background 0.2s, color 0.2s; ' +
-           'font-family: -apple-system, BlinkMacSystemFont, \"Segoe UI\", Roboto, sans-serif; ' +
-           'font-weight: 600; ' +
-           'font-size: 14px; ' +
-           'z-index: 2147483647;';
-  }
-  
-  function getSearchbarStyles(cfg) {
-    return 'background: ' + cfg.bubbleBackgroundColor + '; ' +
-           'color: ' + cfg.bubbleTextColor + '; ' +
-           'border-radius: 24px; ' +
-           'padding: 12px 20px; ' +
-           'display: flex; align-items: center; gap: 12px; ' +
-           'box-shadow: ' + (cfg.bubbleShadow || '0 4px 12px rgba(0,0,0,0.15)') + '; ' +
-           'min-width: 280px; ' +
-           'cursor: text; ' +
-           'transition: transform 0.2s, box-shadow 0.2s; ' +
-           'font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;';
-  }
-  
-  function getSearchbarHTML(cfg) {
-    const iconHtml = cfg.bubbleIcon ? getIconHtml(cfg.bubbleIcon, 20) : getIconHtml('RiSearchLine', 20);
+    // Scale transformation
+    const hoverScale = cfg.bubbleHoverScale || 1.05;
+    let transform = \`scale(\${hoverScale})\`;
     
-    return iconHtml + '<span id="searchbar-placeholder" style="font-size: 14px; opacity: 0.8;">' + (cfg.placeholder || 'Type je bericht...') + '</span>';
-  }
-  
-  function getCustomBoxStyles(cfg) {
-    return 'background: ' + cfg.bubbleBackgroundColor + '; ' +
-           'color: ' + cfg.bubbleTextColor + '; ' +
-           'border-radius: 12px; ' +
-           'padding: 16px 24px; ' +
-           'display: flex; flex-direction: column; align-items: center; gap: 8px; ' +
-           'box-shadow: ' + (cfg.bubbleShadow || '0 4px 12px rgba(0,0,0,0.15)') + '; ' +
-           'cursor: pointer; ' +
-           'max-width: 200px; ' +
-           'transition: transform 0.2s, box-shadow 0.2s; ' +
-           'font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;';
-  }
-  
-  function getCustomBoxHTML(cfg) {
-    const iconHtml = cfg.bubbleIcon ? getIconHtml(cfg.bubbleIcon, 32) : getIconHtml('RiChat1Line', 32);
-    
-    let html = iconHtml;
-    
-    if (cfg.bubbleText) {
-      html += '<span style="font-size: 14px; font-weight: 600; text-align: center;">' + cfg.bubbleText + '</span>';
+    // Add specific hover animations
+    if (cfg.hoverAnimation === 'lift') transform += ' translateY(-4px)';
+    if (cfg.hoverAnimation === 'rotate') transform += ' rotate(10deg)';
+    if (cfg.hoverAnimation === 'pulse') {
+       // Pulse is handled via keyframes, but simple scale works nice too
     }
     
-    if (cfg.greeting) {
-      const shortGreeting = cfg.greeting.substring(0, 40) + (cfg.greeting.length > 40 ? '...' : '');
-      html += '<span style="font-size: 12px; opacity: 0.8; text-align: center;">' + shortGreeting + '</span>';
-    }
+    hoverCss += \`transform: \${transform} !important; box-shadow: 0 12px 24px rgba(0, 0, 0, 0.2) !important; } \`;
     
-    return html;
+    if (cfg.bubbleHoverTextColor) hoverCss += \`#\${bubbleId}:hover .ai-bubble-text { color: \${cfg.bubbleHoverTextColor} !important; } \`;
+    if (cfg.bubbleHoverIconColor) hoverCss += \`#\${bubbleId}:hover .ai-bubble-icon { color: \${cfg.bubbleHoverIconColor} !important; } \`;
+    
+    hoverStyle.textContent = hoverCss;
+    document.head.appendChild(hoverStyle);
+
+    return \`
+      width: \${widthStr};
+      height: \${heightStr};
+      min-width: \${size.height}px; 
+      background: \${background};
+      color: \${cfg.bubbleTextColor};
+      border-radius: \${borderRadius};
+      display: flex; 
+      align-items: center; 
+      justify-content: center;
+      cursor: pointer;
+      box-shadow: \${cfg.bubbleShadow || '0 8px 24px rgba(0,0,0,0.12), 0 2px 8px rgba(0,0,0,0.08)'};
+      transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      font-weight: 600;
+      font-size: 14px;
+      z-index: \${cfg.zIndex || 999999};
+      padding: \${(widthStr === 'auto') ? '0 20px' : '0'};
+      \${glassEffectCss}
+    \`;
   }
-  
+
+  function getBubbleHTML(cfg) {
+    let contentHtml = '';
+    const iconColor = cfg.bubbleIconColor || cfg.bubbleTextColor;
+    
+    // helper to get icon
+    const getIcon = () => {
+      // If we have an image overlay or cover, we might not show icon
+      if (cfg.bubbleImageUrl && (cfg.imageIconRelation === 'cover' || cfg.imageIconRelation === 'overlay')) return '';
+      return cfg.bubbleIcon ? getIconHtml(cfg.bubbleIcon, 24, iconColor) : getIconHtml('RiChat1Line', 24, iconColor);
+    };
+
+    // If Image is present
+    if (cfg.bubbleImageUrl) {
+       const fit = cfg.bubbleImageFit || 'cover';
+       const imgStyle = \`width: 100%; height: 100%; object-fit: \${fit}; border-radius: inherit; display: block;\`;
+       
+       if (cfg.imageIconRelation === 'side-by-side') {
+          // Avatar mode: Image left, Text right
+          const size = '32px';
+          contentHtml = \`<img src="\${cfg.bubbleImageUrl}" style="width: \${size}; height: \${size}; border-radius: 50%; object-fit: cover; margin-right: 12px; border: 2px solid rgba(255,255,255,0.2);">\`;
+          if (cfg.bubbleText) {
+             contentHtml += \`<span class="ai-bubble-text">\${cfg.bubbleText}</span>\`;
+          }
+       } else if (cfg.imageIconRelation === 'grow-from') {
+          // Small bubble that grows? (Complex, maybe simple overlay for now)
+          contentHtml = \`<img src="\${cfg.bubbleImageUrl}" style="\${imgStyle}">\`;
+       } else if (cfg.imageIconRelation === 'overlay') {
+          // Background image with icon on top
+          contentHtml = \`<img src="\${cfg.bubbleImageUrl}" style="position: absolute; top:0; left:0; width: 100%; height: 100%; object-fit: \${fit}; border-radius: inherit; opacity: 0.9;">\`;
+          contentHtml += \`<div style="position: relative; z-index: 2;">\${getIcon()}</div>\`;
+       } else {
+          // Default: Cover (Image replaces everything)
+          contentHtml = \`<img src="\${cfg.bubbleImageUrl}" style="\${imgStyle}">\`;
+       }
+    } else {
+       // Standard Icon + Text
+       if (cfg.bubbleText) {
+         if (cfg.bubbleIcon) {
+            contentHtml = \`<div style="display: flex; align-items: center; gap: 8px;">\${getIcon()}<span class="ai-bubble-text">\${cfg.bubbleText}</span></div>\`;
+         } else {
+            contentHtml = \`<span class="ai-bubble-text">\${cfg.bubbleText}</span>\`;
+         }
+       } else {
+         contentHtml = getIcon();
+       }
+    }
+
+    return contentHtml;
+  }
+
+
+function getSearchbarStyles(cfg) {
+  return 'background: ' + cfg.bubbleBackgroundColor + '; ' +
+    'color: ' + cfg.bubbleTextColor + '; ' +
+    'border-radius: 24px; ' +
+    'padding: 12px 20px; ' +
+    'display: flex; align-items: center; gap: 12px; ' +
+    'box-shadow: ' + (cfg.bubbleShadow || '0 4px 12px rgba(0,0,0,0.15)') + '; ' +
+    'min-width: 280px; ' +
+    'cursor: text; ' +
+    'transition: transform 0.2s, box-shadow 0.2s; ' +
+    'font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;';
+}
+
+function getSearchbarHTML(cfg) {
+  const iconColor = cfg.bubbleIconColor || cfg.bubbleTextColor;
+  const iconHtml = cfg.bubbleIcon ? getIconHtml(cfg.bubbleIcon, 20, iconColor) : getIconHtml('RiSearchLine', 20, iconColor);
+  return iconHtml + '<span id="searchbar-placeholder" style="font-size: 14px; opacity: 0.8;">' + (cfg.placeholder || 'Type your message...') + '</span>';
+}
+
+function getCustomBoxStyles(cfg) {
+  return 'background: ' + cfg.bubbleBackgroundColor + '; ' +
+    'color: ' + cfg.bubbleTextColor + '; ' +
+    'border-radius: 12px; ' +
+    'padding: 16px 24px; ' +
+    'display: flex; flex-direction: column; align-items: center; gap: 8px; ' +
+    'box-shadow: ' + (cfg.bubbleShadow || '0 4px 12px rgba(0,0,0,0.15)') + '; ' +
+    'cursor: pointer; ' +
+    'max-width: 200px; ' +
+    'transition: transform 0.2s, box-shadow 0.2s; ' +
+    'font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;';
+}
+
+function getCustomBoxHTML(cfg) {
+  const iconColor = cfg.bubbleIconColor || cfg.bubbleTextColor;
+  const iconHtml = cfg.bubbleIcon ? getIconHtml(cfg.bubbleIcon, 32, iconColor) : getIconHtml('RiChat1Line', 32, iconColor);
+
+  let html = iconHtml;
+
+  if (cfg.bubbleText) {
+    html += '<span style="font-size: 14px; font-weight: 600; text-align: center;">' + cfg.bubbleText + '</span>';
+  }
+
+  if (cfg.greeting) {
+    const shortGreeting = cfg.greeting.substring(0, 40) + (cfg.greeting.length > 40 ? '...' : '');
+    html += '<span style="font-size: 12px; opacity: 0.8; text-align: center;">' + shortGreeting + '</span>';
+  }
+
+  return html;
+}
+
+function getChatWindowHTML(cfg, apiUrl) {
+  // Close button customization
+  const closeIconColor = cfg.headerCloseIconColor || cfg.headerTextColor;
+  const closeIconBg = cfg.headerCloseIconBackgroundColor || 'rgba(255,255,255,0.1)';
+  const closeIconHtml = cfg.headerCloseIcon ? getIconHtml(cfg.headerCloseIcon, 20, closeIconColor) : '&times;';
+
+  // Add hover styles for close button
+  if (cfg.headerCloseIconHoverColor || cfg.headerCloseIconHoverBackgroundColor) {
+    const hoverStyle = document.createElement('style');
+    let css = '#ai-chat-close:hover { ';
+    if (cfg.headerCloseIconHoverColor) css += 'color: ' + cfg.headerCloseIconHoverColor + ' !important; ';
+    if (cfg.headerCloseIconHoverBackgroundColor) css += 'background: ' + cfg.headerCloseIconHoverBackgroundColor + ' !important; ';
+    css += '}';
+    hoverStyle.textContent = css;
+    document.head.appendChild(hoverStyle);
+  }
+
+  // Avatar and online status colors
+  const avatarBg = cfg.avatarBackgroundColor || 'rgba(255,255,255,0.15)';
+  const onlineColor = cfg.onlineStatusColor || '#22c55e';
+
+  // Input field customization
+  const inputBorderColor = cfg.inputBorderColor || '#e5e7eb';
+  const inputFocusBorderColor = cfg.inputFocusBorderColor || cfg.primaryColor;
+  const inputBgColor = cfg.inputBackgroundColor || '#ffffff';
+  const inputTextColor = cfg.inputTextColor || '#1f2937';
+
+  // Add placeholder color style if set
+  if (cfg.inputPlaceholderColor) {
+    const style = document.createElement('style');
+    style.textContent = '#ai-chat-input::placeholder { color: ' + cfg.inputPlaceholderColor + '; }';
+    document.head.appendChild(style);
+  }
+
+  // Send button customization
+  const sendBtnBg = cfg.sendButtonBackgroundColor || cfg.primaryColor;
+  const sendBtnIconColor = cfg.sendButtonIconColor || '#ffffff';
+  const sendIconHtml = cfg.sendButtonIcon ? getIconHtml(cfg.sendButtonIcon, 20, sendBtnIconColor) : '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>';
+
+  // Add hover styles for send button
+  if (cfg.sendButtonHoverBackgroundColor || cfg.sendButtonHoverIconColor) {
+    const hoverStyle = document.createElement('style');
+    let css = '#ai-chat-send:hover { ';
+    if (cfg.sendButtonHoverBackgroundColor) css += 'background: ' + cfg.sendButtonHoverBackgroundColor + ' !important; ';
+    if (cfg.sendButtonHoverIconColor) css += 'color: ' + cfg.sendButtonHoverIconColor + ' !important; ';
+    css += '}';
+    hoverStyle.textContent = css;
+    document.head.appendChild(hoverStyle);
+  }
+  // Avatar - support custom image, emoji, or fallback
+  let avatarContent = '👤'; // Default emoji
+  if (cfg.headerAvatarUrl) {
+    avatarContent = '<img src="' + cfg.headerAvatarUrl + '" alt="Avatar" style="width: 100%; height: 100%; object-fit: cover;" />';
+  } else if (cfg.headerAvatarEmoji) {
+    avatarContent = cfg.headerAvatarEmoji;
+  }
+
+  // Configurable colors with sensible defaults
+  let chatBgColor = cfg.chatBackgroundColor || '#f9fafb';
+  let inputAreaBgColor = cfg.inputAreaBackgroundColor || '#ffffff';
+  let inputAreaBorderColor = cfg.inputAreaBorderColor || '#f3f4f6';
+  let headerBgColor = cfg.headerBackgroundColor; // Default
+  const typingColor = cfg.typingIndicatorColor || '#6b7280';
+
+  // Glass Effect overrides
+  if (cfg.glassEffect) {
+     headerBgColor = 'transparent';
+     chatBgColor = 'transparent';
+     inputAreaBgColor = 'rgba(255,255,255,0.4)';
+     inputAreaBorderColor = 'rgba(255,255,255,0.2)';
+     if (cfg.theme === 'dark') {
+        inputAreaBgColor = 'rgba(0,0,0,0.3)';
+        inputAreaBorderColor = 'rgba(255,255,255,0.1)';
+     }
+  }
+
+  return '<div style=\"background: ' + headerBgColor + '; color: ' + cfg.headerTextColor + '; padding: 20px; display: flex; align-items: center; justify-content: space-between;\">' +
+    '<div style=\"display: flex; align-items: center; gap: 16px;\">' +
+    (cfg.showAgentAvatar ? '<div style=\"width: 44px; height: 44px; border-radius: 50%; background: ' + avatarBg + '; display: flex; align-items: center; justify-content: center; overflow: hidden; backdrop-filter: blur(4px); box-shadow: 0 2px 8px rgba(0,0,0,0.1);\">' + avatarContent + '</div>' : '') +
+    '<div>' +
+    '<div style=\"font-weight: 700; font-size: 18px; letter-spacing: -0.02em;\">' + (cfg.headerTitle || 'Chat Support') + '</div>' +
+    (cfg.headerSubtitle ? '<div style=\"font-size: 13px; opacity: 0.9; margin-top: 2px;\">' + cfg.headerSubtitle + '</div>' : '') +
+    (cfg.showOnlineStatus ? '<div style=\"display: flex; align-items: center; gap: 6px; font-size: 12px; opacity: 0.9; margin-top: 4px;\"><span style=\"width: 8px; height: 8px; background: ' + onlineColor + '; border-radius: 50%; display: inline-block; border: 1.5px solid rgba(255,255,255,0.5);\"></span> Online</div>' : '') +
+    '</div>' +
+    '</div>' +
+    '<button id=\"ai-chat-close\" style=\"background: ' + closeIconBg + '; border: none; color: ' + closeIconColor + '; font-size: 20px; cursor: pointer; padding: 0; width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center; transition: background 0.2s, color 0.2s;\">' +
+    closeIconHtml +
+    '</button>' +
+    '</div>' +
+    '<div id=\"ai-chat-messages\" style=\"flex: 1; overflow-y: auto; padding: 20px; display: flex; flex-direction: column; gap: 16px; background: ' + chatBgColor + ';\"></div>' +
+    '<div style=\"padding: 20px; border-top: 1px solid ' + inputAreaBorderColor + '; background: ' + inputAreaBgColor + ';\">' +
+    '<div id=\"ai-chat-typing\" style=\"display: none; color: ' + typingColor + '; font-size: 12px; margin-bottom: 12px; padding-left: 4px;\">AI is typing...</div>' +
+    '<div style=\"display: flex; gap: 12px; align-items: flex-end;\">' +
+    '<input id=\"ai-chat-input\" type=\"text\" placeholder=\"' + cfg.placeholder + '\" style=\"flex: 1; padding: 12px 16px; border: 1px solid ' + inputBorderColor + '; border-radius: 12px; font-size: 15px; outline: none; transition: border-color 0.2s, box-shadow 0.2s; background: ' + inputBgColor + '; color: ' + inputTextColor + ';\" onfocus=\"this.style.borderColor=\\'' + inputFocusBorderColor + '\\'; this.style.boxShadow=\\'0 0 0 3px rgba(99, 102, 241, 0.1) \\';\" onblur=\"this.style.borderColor=\\'' + inputBorderColor + '\\'; this.style.boxShadow=\\'none\\';\" />' +
+      '<button id=\"ai-chat-send\" style=\"background: ' + sendBtnBg + '; color: ' + sendBtnIconColor + '; border: none; padding: 0; width: 46px; height: 46px; border-radius: 12px; font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0; transition: transform 0.1s, background 0.2s, color 0.2s; box-shadow: 0 4px 12px rgba(0,0,0,0.1);\" onmousedown=\"this.style.transform=\\'scale(0.95) \\'\" onmouseup=\"this.style.transform=\\'scale(1) \\'\">' +
+        sendIconHtml +
+        '</button>' +
+        '</div>' +
+        '</div>' +
+        (cfg.showBranding ? '<div style=\"padding: 8px; text-align: center; font-size: 11px; color: #9ca3af; background: ' + chatBgColor + '; border-top: 1px solid ' + inputAreaBorderColor + ';\"><a href=\"' + (cfg.brandingUrl || 'https://bonsaimedia.nl') + '\" target=\"_blank\" style=\"color: inherit; text-decoration: none;\">' + (cfg.brandingText || 'Powered by BonsaiMedia.nl') + '</a></div>' : '');
+}
+
   function getChatWindowStyles(cfg) {
     const layoutMode = cfg.layoutMode || 'fixed';
     const chatOffsetX = cfg.chatOffsetX || 0;
     const chatOffsetY = cfg.chatOffsetY || 0;
+  
+    // Background handling
+    let background = '#ffffff'; // Fallback
+    if (cfg.chatBackgroundColor) background = cfg.chatBackgroundColor;
+  
+    // Gradient override
+    if (cfg.backgroundGradient && cfg.backgroundGradient.from && cfg.backgroundGradient.to) {
+      // If glass is enabled, we might want the chat window to be white/solid usually, 
+      // but if they want the gradient on the window too:
+      // background = \`linear-gradient(...)\`; 
+      // Typically chat windows are solid reading surfaces. Let's keep it solid or glass.
+    }
+  
+    // Glass Effect for Window
+    let glassEffectCss = '';
+    if (cfg.glassEffect) {
+      const blur = cfg.backdropBlur || 12;
+      // Make background semi-transparent if it's currently hex
+      // This is a naive heuristic; usually we want rgba(255,255,255, 0.8) for glass
+      background = 'rgba(255, 255, 255, 0.85)';
+      if (cfg.theme === 'dark') background = 'rgba(20, 20, 20, 0.85)';
+  
+      glassEffectCss = \`backdrop-filter: blur(\${blur}px); -webkit-backdrop-filter: blur(\${blur}px); border: 1px solid rgba(255,255,255,0.2);\`;
+    }
+  
     let sizeStyles = '';
     let positionStyles = '';
-    
+  
     // Determine size based on layout mode
     switch (layoutMode) {
       case 'full-height':
-        sizeStyles = 'width: ' + (cfg.chatWidth || 400) + 'px; height: 98vh; ';
-        positionStyles = 'position: fixed; top: ' + (1 - chatOffsetY/100) + 'vh; bottom: ' + (1 + chatOffsetY/100) + 'vh; right: ' + (-chatOffsetX) + 'px; ';
+        sizeStyles = 'width: ' + (cfg.chatWidth || 400) + 'px; height: calc(100vh - 40px); ';
+        positionStyles = 'position: fixed; bottom: 20px; right: ' + (20 - chatOffsetX) + 'px; ';
         break;
-      
+  
       case 'full-width':
         sizeStyles = 'width: 100vw; height: ' + (cfg.chatHeight || 600) + 'px; ';
-        positionStyles = 'position: fixed; bottom: ' + (-chatOffsetY) + 'px; left: ' + chatOffsetX + 'px; right: ' + (-chatOffsetX) + 'px; ';
+        positionStyles = 'position: fixed; bottom: ' + (-chatOffsetY) + 'px; left: 0; ';
         break;
-      
+  
       case 'percentage':
         const widthPct = cfg.widthPercentage || 80;
         const heightPct = cfg.heightPercentage || 80;
         sizeStyles = 'width: ' + widthPct + 'vw; height: ' + heightPct + 'vh; ';
-        
-        // Apply constraints if provided
-        if (cfg.minWidth) sizeStyles += 'min-width: ' + cfg.minWidth + 'px; ';
-        if (cfg.maxWidth) sizeStyles += 'max-width: ' + cfg.maxWidth + 'px; ';
-        if (cfg.minHeight) sizeStyles += 'min-height: ' + cfg.minHeight + 'px; ';
-        if (cfg.maxHeight) sizeStyles += 'max-height: ' + cfg.maxHeight + 'px; ';
-        
-        positionStyles = 'position: absolute; bottom: ' + (-chatOffsetY) + 'px; right: ' + (-chatOffsetX) + 'px; ';
+  
+        positionStyles = 'position: fixed; bottom: ' + (20 - chatOffsetY) + 'px; right: ' + (20 - chatOffsetX) + 'px; ';
         break;
-      
-      case 'custom':
-        // Use percentages with custom constraints
-        const customWidthPct = cfg.widthPercentage || 50;
-        const customHeightPct = cfg.heightPercentage || 50;
-        sizeStyles = 'width: ' + customWidthPct + 'vw; height: ' + customHeightPct + 'vh; ';
-        
-        if (cfg.minWidth) sizeStyles += 'min-width: ' + cfg.minWidth + 'px; ';
-        if (cfg.maxWidth) sizeStyles += 'max-width: ' + cfg.maxWidth + 'px; ';
-        if (cfg.minHeight) sizeStyles += 'min-height: ' + cfg.minHeight + 'px; ';
-        if (cfg.maxHeight) sizeStyles += 'max-height: ' + cfg.maxHeight + 'px; ';
-        
-        positionStyles = 'position: absolute; bottom: ' + (-chatOffsetY) + 'px; right: ' + (-chatOffsetX) + 'px; ';
-        break;
-      
+  
       case 'fixed':
       default:
         sizeStyles = 'width: ' + (cfg.chatWidth || 400) + 'px; height: ' + (cfg.chatHeight || 600) + 'px; ';
-        positionStyles = 'position: absolute; bottom: ' + (-chatOffsetY) + 'px; right: ' + (-chatOffsetX) + 'px; ';
+        positionStyles = 'position: absolute; bottom: ' + (80 - chatOffsetY) + 'px; right: ' + (-chatOffsetX) + 'px; ';
+        // Note: 'bottom: 80px' helps position it above the bubble usually
         break;
     }
-    
+  
     return sizeStyles + positionStyles +
-           'background: white; ' +
-           'border-radius: ' + (cfg.chatBorderRadius || 16) + 'px; ' +
-           'box-shadow: 0 12px 48px rgba(0,0,0,0.12), 0 4px 16px rgba(0,0,0,0.04); ' +
-           'border: 1px solid rgba(0,0,0,0.08); ' +
-           'display: flex; flex-direction: column; ' +
-           'overflow: hidden; ' +
-           'font-family: -apple-system, BlinkMacSystemFont, \"Segoe UI\", Roboto, sans-serif; ' +
-           'transition: opacity 0.2s, transform 0.2s;';
+      'background: ' + background + '; ' +
+      'border-radius: ' + (cfg.chatBorderRadius || 24) + 'px; ' +
+      'box-shadow: ' + (cfg.shadowIntensity === 'none' ? 'none' : '0 12px 48px rgba(0,0,0,0.12), 0 4px 16px rgba(0,0,0,0.04)') + '; ' +
+      'border: ' + (cfg.glassEffect ? '1px solid rgba(255,255,255,0.2)' : '1px solid rgba(0,0,0,0.08)') + '; ' +
+      'display: flex; flex-direction: column; ' +
+      'overflow: hidden; ' +
+      'font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; ' +
+      'transform-origin: bottom right; ' +
+      glassEffectCss;
   }
+
+  function applyOpenAnimation(el, type, duration = 300) {
+    // Reset previous animation
+    el.style.animation = 'none';
+    el.offsetHeight; /* trigger reflow */
   
-  function getChatWindowHTML(cfg, apiUrl) {
-    // Close button customization
-    const closeIconColor = cfg.headerCloseIconColor || cfg.headerTextColor;
-    const closeIconBg = cfg.headerCloseIconBackgroundColor || 'rgba(255,255,255,0.1)';
-    const closeIconHtml = cfg.headerCloseIcon ? getIconHtml(cfg.headerCloseIcon, 20, closeIconColor) : '&times;';
-    
-    // Add hover styles for close button
-    if (cfg.headerCloseIconHoverColor || cfg.headerCloseIconHoverBackgroundColor) {
-      const hoverStyle = document.createElement('style');
-      let css = '#ai-chat-close:hover { ';
-      if (cfg.headerCloseIconHoverColor) css += 'color: ' + cfg.headerCloseIconHoverColor + ' !important; ';
-      if (cfg.headerCloseIconHoverBackgroundColor) css += 'background: ' + cfg.headerCloseIconHoverBackgroundColor + ' !important; ';
-      css += '}';
-      hoverStyle.textContent = css;
-      document.head.appendChild(hoverStyle);
+    let keyframes = '';
+    let animationName = '';
+  
+    // Physics-based beziers
+    const spring = 'cubic-bezier(0.175, 0.885, 0.32, 1.275)';
+    const smooth = 'cubic-bezier(0.16, 1, 0.3, 1)';
+  
+    switch (type) {
+      case 'fade':
+        animationName = 'aiFadeIn';
+        keyframes = \`@keyframes aiFadeIn { from { opacity: 0; } to { opacity: 1; } }\`;
+        break;
+      case 'scale':
+        animationName = 'aiScaleIn';
+        keyframes = \`@keyframes aiScaleIn { from { transform: scale(0.9) translateY(20px); opacity: 0; } to { transform: scale(1) translateY(0); opacity: 1; } }\`;
+        // Override duration for scale to feel snappier
+        break;
+      case 'slide-down':
+        animationName = 'aiSlideDown';
+        keyframes = \`@keyframes aiSlideDown { from { transform: translateY(-20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }\`;
+        break;
+      case 'slide-up':
+      default:
+        animationName = 'aiSlideUp';
+        keyframes = \`@keyframes aiSlideUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }\`;
+        break;
     }
-    
-    // Avatar and online status colors
-    const avatarBg = cfg.avatarBackgroundColor || 'rgba(255,255,255,0.15)';
-    const onlineColor = cfg.onlineStatusColor || '#22c55e';
-    
-    // Input field customization
-    const inputBorderColor = cfg.inputBorderColor || '#e5e7eb';
-    const inputFocusBorderColor = cfg.inputFocusBorderColor || cfg.primaryColor;
-    const inputBgColor = cfg.inputBackgroundColor || '#ffffff';
-    const inputTextColor = cfg.inputTextColor || '#1f2937';
-    
-    // Add placeholder color style if set
-    if (cfg.inputPlaceholderColor) {
+  
+    if (animationName && !document.getElementById('ai-anim-' + animationName)) {
       const style = document.createElement('style');
-      style.textContent = '#ai-chat-input::placeholder { color: ' + cfg.inputPlaceholderColor + '; }';
+      style.id = 'ai-anim-' + animationName;
+      style.textContent = keyframes;
       document.head.appendChild(style);
     }
-    
-    // Send button customization
-    const sendBtnBg = cfg.sendButtonBackgroundColor || cfg.primaryColor;
-    const sendBtnIconColor = cfg.sendButtonIconColor || '#ffffff';
-    const sendIconHtml = cfg.sendButtonIcon ? getIconHtml(cfg.sendButtonIcon, 20, sendBtnIconColor) : '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>';
-    
-    // Add hover styles for send button
-    if (cfg.sendButtonHoverBackgroundColor || cfg.sendButtonHoverIconColor) {
-      const hoverStyle = document.createElement('style');
-      let css = '#ai-chat-send:hover { ';
-      if (cfg.sendButtonHoverBackgroundColor) css += 'background: ' + cfg.sendButtonHoverBackgroundColor + ' !important; ';
-      if (cfg.sendButtonHoverIconColor) css += 'color: ' + cfg.sendButtonHoverIconColor + ' !important; ';
-      css += '}';
-      hoverStyle.textContent = css;
-      document.head.appendChild(hoverStyle);
-    }
-    // Avatar - support custom image, emoji, or fallback
-    let avatarContent = '👤'; // Default emoji
-    if (cfg.headerAvatarUrl) {
-      avatarContent = '<img src="' + cfg.headerAvatarUrl + '" alt="Avatar" style="width: 100%; height: 100%; object-fit: cover;" />';
-    } else if (cfg.headerAvatarEmoji) {
-      avatarContent = cfg.headerAvatarEmoji;
-    }
-    
-    // Configurable colors with sensible defaults
-    const chatBgColor = cfg.chatBackgroundColor || '#f9fafb';
-    const inputAreaBgColor = cfg.inputAreaBackgroundColor || '#ffffff';
-    const inputAreaBorderColor = cfg.inputAreaBorderColor || '#f3f4f6';
-    const typingColor = cfg.typingIndicatorColor || '#6b7280';
-    
-    return '<div style=\"background: ' + cfg.headerBackgroundColor + '; color: ' + cfg.headerTextColor + '; padding: 20px; display: flex; align-items: center; justify-content: space-between;\">' +
-      '<div style=\"display: flex; align-items: center; gap: 16px;\">' +
-        (cfg.showAgentAvatar ? '<div style=\"width: 44px; height: 44px; border-radius: 50%; background: ' + avatarBg + '; display: flex; align-items: center; justify-content: center; overflow: hidden; backdrop-filter: blur(4px); box-shadow: 0 2px 8px rgba(0,0,0,0.1);\">' + avatarContent + '</div>' : '') +
-        '<div>' +
-          '<div style=\"font-weight: 700; font-size: 18px; letter-spacing: -0.02em;\">' + (cfg.headerTitle || 'Chat Support') + '</div>' +
-          (cfg.headerSubtitle ? '<div style=\"font-size: 13px; opacity: 0.9; margin-top: 2px;\">' + cfg.headerSubtitle + '</div>' : '') +
-          (cfg.showOnlineStatus ? '<div style=\"display: flex; align-items: center; gap: 6px; font-size: 12px; opacity: 0.9; margin-top: 4px;\"><span style=\"width: 8px; height: 8px; background: ' + onlineColor + '; border-radius: 50%; display: inline-block; border: 1.5px solid rgba(255,255,255,0.5);\"></span> Online</div>' : '') +
-        '</div>' +
+  
+    // Use smooth physics curve
+    el.style.animation = \`\${animationName} \${duration}ms \${smooth} forwards\`;
+  }
+
+
+function expandSearchbar(searchbar, cfg, apiUrl) {
+  // Determine height based on layout mode
+  const layoutMode = cfg.layoutMode || 'fixed';
+  let expandHeight = '400px';
+  let expandWidth = '360px';
+
+  if (layoutMode === 'full-height') {
+    expandHeight = '98vh';
+    expandWidth = (cfg.chatWidth || 400) + 'px';
+  } else if (layoutMode === 'percentage') {
+    expandHeight = (cfg.heightPercentage || 80) + 'vh';
+    expandWidth = (cfg.widthPercentage || 30) + 'vw';
+  } else if (layoutMode === 'custom') {
+    expandHeight = (cfg.heightPercentage || 50) + 'vh';
+    expandWidth = (cfg.widthPercentage || 30) + 'vw';
+  } else {
+    expandHeight = (cfg.chatHeight || 400) + 'px';
+    expandWidth = (cfg.chatWidth || 360) + 'px';
+  }
+
+  // Add expansion keyframe if not exists
+  if (!document.getElementById('searchbar-expand-style')) {
+    const style = document.createElement('style');
+    style.id = 'searchbar-expand-style';
+    style.textContent = '@keyframes expandHeight { from { height: 44px; } to { height: ' + expandHeight + '; } }';
+    document.head.appendChild(style);
+  }
+
+  // Replace placeholder with input
+  const placeholder = searchbar.querySelector('#searchbar-placeholder');
+  if (placeholder) {
+    placeholder.remove();
+  }
+
+  // Update searchbar styles for expansion
+  searchbar.style.transition = 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)';
+  searchbar.style.flexDirection = 'column';
+  searchbar.style.alignItems = 'stretch';
+  searchbar.style.height = expandHeight;
+  searchbar.style.minWidth = expandWidth;
+  searchbar.style.padding = '0';
+  searchbar.style.borderRadius = '16px';
+  searchbar.style.cursor = 'default';
+
+  // Create inline chat interface
+  setTimeout(() => {
+    const icon = searchbar.querySelector('i');
+    if (icon) icon.remove();
+
+    searchbar.innerHTML =
+      '<div style="background: ' + cfg.headerBackgroundColor + '; color: ' + cfg.headerTextColor + '; padding: 16px; display: flex; align-items: center; justify-content: space-between; border-radius: 16px 16px 0 0;">' +
+      '<div style="font-weight: 600; font-size: 16px;">' + (cfg.headerTitle || 'Chat Support') + '</div>' +
+      '<button id="searchbar-close" style="background: none; border: none; color: ' + cfg.headerTextColor + '; font-size: 20px; cursor: pointer; padding: 0; width: 28px; height: 28px; opacity: 0.8; hover:opacity: 1;">&times;</button>' +
       '</div>' +
-      '<button id=\"ai-chat-close\" style=\"background: ' + closeIconBg + '; border: none; color: ' + closeIconColor + '; font-size: 20px; cursor: pointer; padding: 0; width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center; transition: background 0.2s, color 0.2s;\">' +
-        closeIconHtml +
-      '</button>' +
-    '</div>' +
-    '<div id=\"ai-chat-messages\" style=\"flex: 1; overflow-y: auto; padding: 20px; display: flex; flex-direction: column; gap: 16px; background: ' + chatBgColor + ';\"></div>' +
-    '<div style=\"padding: 20px; border-top: 1px solid ' + inputAreaBorderColor + '; background: ' + inputAreaBgColor + ';\">' +
-      '<div id=\"ai-chat-typing\" style=\"display: none; color: ' + typingColor + '; font-size: 12px; margin-bottom: 12px; padding-left: 4px;\">AI is typing...</div>' +
-      '<div style=\"display: flex; gap: 12px; align-items: flex-end;\">' +
-        '<input id=\"ai-chat-input\" type=\"text\" placeholder=\"' + cfg.placeholder + '\" style=\"flex: 1; padding: 12px 16px; border: 1px solid ' + inputBorderColor + '; border-radius: 12px; font-size: 15px; outline: none; transition: border-color 0.2s, box-shadow 0.2s; background: ' + inputBgColor + '; color: ' + inputTextColor + ';\" onfocus=\"this.style.borderColor=\\'' + inputFocusBorderColor + '\\'; this.style.boxShadow=\\'0 0 0 3px rgba(99, 102, 241, 0.1)\\';\" onblur=\"this.style.borderColor=\\'' + inputBorderColor + '\\'; this.style.boxShadow=\\'none\\';\" />' +
-        '<button id=\"ai-chat-send\" style=\"background: ' + sendBtnBg + '; color: ' + sendBtnIconColor + '; border: none; padding: 0; width: 46px; height: 46px; border-radius: 12px; font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0; transition: transform 0.1s, background 0.2s, color 0.2s; box-shadow: 0 4px 12px rgba(0,0,0,0.1);\" onmousedown=\"this.style.transform=\\'scale(0.95)\\'\" onmouseup=\"this.style.transform=\\'scale(1)\\'\">' +
-          sendIconHtml +
-        '</button>' +
+      '<div id="searchbar-messages" style="flex: 1; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 12px; background: #fafafa;"></div>' +
+      '<div style="padding: 16px; border-top: 1px solid #e5e7eb; background: white; border-radius: 0 0 16px 16px;">' +
+      '<div id="searchbar-typing" style="display: none; color: #6b7280; font-size: 12px; margin-bottom: 8px;">AI is typing...</div>' +
+      '<div style="display: flex; gap: 8px;">' +
+      '<input id="searchbar-input" type="text" placeholder="' + cfg.placeholder + '" autofocus style="flex: 1; padding: 12px; border: 1px solid #d1d5db; border-radius: 8px; font-size: 14px; outline: none;" />' +
+      '<button id="searchbar-send" style="background: ' + cfg.bubbleBackgroundColor + '; color: ' + cfg.bubbleTextColor + '; border: none; padding: 12px 20px; border-radius: 8px; font-weight: 600; cursor: pointer; white-space: nowrap;">Send</button>' +
       '</div>' +
-    '</div>' +
-    (cfg.showBranding ? '<div style=\"padding: 8px; text-align: center; font-size: 11px; color: #9ca3af; background: ' + chatBgColor + '; border-top: 1px solid ' + inputAreaBorderColor + ';\"><a href=\"' + (cfg.brandingUrl || 'https://bonsaimedia.nl') + '\" target=\"_blank\" style=\"color: inherit; text-decoration: none;\">' + (cfg.brandingText || 'Powered by BonsaiMedia.nl') + '</a></div>' : '');
-  }
-  
-  function getAnimation(type) {
-    const animations = {
-      bounce: '@keyframes aiBounce { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-10px); } }',
-      pulse: '@keyframes aiPulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.1); } }',
-      shake: '@keyframes aiShake { 0%, 100% { transform: translateX(0); } 25% { transform: translateX(-5px); } 75% { transform: translateX(5px); } }'
-    };
-    if (animations[type]) {
-      const style = document.createElement('style');
-      style.textContent = animations[type];
-      document.head.appendChild(style);
-      return 'ai' + type.charAt(0).toUpperCase() + type.slice(1);
-    }
-    return 'none';
-  }
-  
-  function applyOpenAnimation(el, type) {
-    if (type === 'slide-up') {
-      el.style.animation = 'slideUp 0.3s ease';
-      const style = document.createElement('style');
-      style.textContent = '@keyframes slideUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }';
-      document.head.appendChild(style);
-    } else if (type === 'fade') {
-      el.style.animation = 'fadeIn 0.3s ease';
-      const style = document.createElement('style');
-      style.textContent = '@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }';
-      document.head.appendChild(style);
-    } else if (type === 'scale') {
-      el.style.animation = 'scaleIn 0.3s ease';
-      const style = document.createElement('style');
-      style.textContent = '@keyframes scaleIn { from { transform: scale(0.8); opacity: 0; } to { transform: scale(1); opacity: 1; } }';
-      document.head.appendChild(style);
-    }
-  }
-  
-  function expandSearchbar(searchbar, cfg, apiUrl) {
-    // Determine height based on layout mode
-    const layoutMode = cfg.layoutMode || 'fixed';
-    let expandHeight = '400px';
-    let expandWidth = '360px';
-    
-    if (layoutMode === 'full-height') {
-      expandHeight = '98vh';
-      expandWidth = (cfg.chatWidth || 400) + 'px';
-    } else if (layoutMode === 'percentage') {
-      expandHeight = (cfg.heightPercentage || 80) + 'vh';
-      expandWidth = (cfg.widthPercentage || 30) + 'vw';
-    } else if (layoutMode === 'custom') {
-      expandHeight = (cfg.heightPercentage || 50) + 'vh';
-      expandWidth = (cfg.widthPercentage || 30) + 'vw';
-    } else {
-      expandHeight = (cfg.chatHeight || 400) + 'px';
-      expandWidth = (cfg.chatWidth || 360) + 'px';
-    }
-    
-    // Add expansion keyframe if not exists
-    if (!document.getElementById('searchbar-expand-style')) {
-      const style = document.createElement('style');
-      style.id = 'searchbar-expand-style';
-      style.textContent = '@keyframes expandHeight { from { height: 44px; } to { height: ' + expandHeight + '; } }';
-      document.head.appendChild(style);
-    }
-    
-    // Replace placeholder with input
-    const placeholder = searchbar.querySelector('#searchbar-placeholder');
-    if (placeholder) {
-      placeholder.remove();
-    }
-    
-    // Update searchbar styles for expansion
-    searchbar.style.transition = 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)';
-    searchbar.style.flexDirection = 'column';
-    searchbar.style.alignItems = 'stretch';
-    searchbar.style.height = expandHeight;
-    searchbar.style.minWidth = expandWidth;
-    searchbar.style.padding = '0';
-    searchbar.style.borderRadius = '16px';
-    searchbar.style.cursor = 'default';
-    
-    // Create inline chat interface
-    setTimeout(() => {
-      const icon = searchbar.querySelector('i');
-      if (icon) icon.remove();
-      
-      searchbar.innerHTML = 
-        '<div style="background: ' + cfg.headerBackgroundColor + '; color: ' + cfg.headerTextColor + '; padding: 16px; display: flex; align-items: center; justify-content: space-between; border-radius: 16px 16px 0 0;">' +
-          '<div style="font-weight: 600; font-size: 16px;">' + (cfg.headerTitle || 'Chat Support') + '</div>' +
-          '<button id="searchbar-close" style="background: none; border: none; color: ' + cfg.headerTextColor + '; font-size: 20px; cursor: pointer; padding: 0; width: 28px; height: 28px; opacity: 0.8; hover:opacity: 1;">&times;</button>' +
-        '</div>' +
-        '<div id="searchbar-messages" style="flex: 1; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 12px; background: #fafafa;"></div>' +
-        '<div style="padding: 16px; border-top: 1px solid #e5e7eb; background: white; border-radius: 0 0 16px 16px;">' +
-          '<div id="searchbar-typing" style="display: none; color: #6b7280; font-size: 12px; margin-bottom: 8px;">AI is typing...</div>' +
-          '<div style="display: flex; gap: 8px;">' +
-            '<input id="searchbar-input" type="text" placeholder="' + cfg.placeholder + '" autofocus style="flex: 1; padding: 12px; border: 1px solid #d1d5db; border-radius: 8px; font-size: 14px; outline: none;" />' +
-            '<button id="searchbar-send" style="background: ' + cfg.bubbleBackgroundColor + '; color: ' + cfg.bubbleTextColor + '; border: none; padding: 12px 20px; border-radius: 8px; font-weight: 600; cursor: pointer; white-space: nowrap;">Send</button>' +
-          '</div>' +
-        '</div>';
-      
-      // Close button handler
-      const closeBtn = document.getElementById('searchbar-close');
-      closeBtn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        collapseSearchbar(searchbar, cfg);
-      });
-      
-      // Initialize inline chat
-      initializeInlineChat(cfg, apiUrl);
-      
-      // Focus input
-      const input = document.getElementById('searchbar-input');
-      if (input) input.focus();
-    }, 100);
-  }
-  
-  function collapseSearchbar(searchbar, cfg) {
-    searchbar.style.height = '44px';
-    searchbar.style.minWidth = '280px';
-    searchbar.style.padding = '12px 20px';
-    searchbar.style.flexDirection = 'row';
-    searchbar.style.alignItems = 'center';
-    searchbar.style.borderRadius = '24px';
-    searchbar.style.cursor = 'text';
-    
-    setTimeout(() => {
-      searchbar.innerHTML = getSearchbarHTML(cfg);
-    }, 400);
-  }
-  
-  let socket = null;
-  let currentConversationId = null;
-  
-  function initializeInlineChat(cfg, apiUrl) {
-    const messagesContainer = document.getElementById('searchbar-messages');
+      '</div>';
+
+    // Close button handler
+    const closeBtn = document.getElementById('searchbar-close');
+    closeBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      collapseSearchbar(searchbar, cfg);
+    });
+
+    // Initialize inline chat
+    initializeInlineChat(cfg, apiUrl);
+
+    // Focus input
     const input = document.getElementById('searchbar-input');
-    const sendBtn = document.getElementById('searchbar-send');
-    const typingIndicator = document.getElementById('searchbar-typing');
-    
-    // Initialize Socket.io
-    if (!socket) {
-      socket = io(apiUrl);
-      
-      socket.on('connect', () => {
-        // Connection established
-      });
-      
-      socket.on('message:new', (data) => {
-        // Ignore own messages to avoid duplication and wrong role assignment
-        if (data.role && data.role.toLowerCase() === 'user') return;
-        appendInlineMessage(data.content, false, cfg);
-      });
-      
-      socket.on('ai:thinking', () => {
-        if (typingIndicator) typingIndicator.style.display = 'block';
-      });
-      
-      socket.on('ai:response', (data) => {
-        if (typingIndicator) typingIndicator.style.display = 'none';
-        appendInlineMessage(data.content, false, cfg, data.metadata?.sources);
-        if (cfg.soundEnabled) playNotificationSound();
-      });
-    }
-    
-    // Create conversation
-    if (!currentConversationId) {
-      fetch(apiUrl + '/api/widgets/config/' + cfg.installCode)
-        .then(res => res.json())
-        .then(widgetData => {
-          return fetch(apiUrl + '/api/chat/conversations/start', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              widgetId: widgetData.id,
-              visitorMetadata: {
-                userAgent: navigator.userAgent,
-                language: navigator.language,
-                referrer: document.referrer,
-                currentUrl: window.location.href
-              }
-            })
-          });
-        })
-        .then(res => res.json())
-        .then(data => {
-          currentConversationId = data.id;
-          socket.emit('join:conversation', { conversationId: currentConversationId });
-          
-          if (cfg.greeting) {
-            appendInlineMessage(cfg.greeting, false, cfg);
-          }
-        })
-        .catch(err => {
-          console.error('Failed to create conversation:', err);
-          if (messagesContainer) {
-            messagesContainer.innerHTML = '<div style="padding: 20px; text-align: center; color: #ef4444;">Failed to connect. Please refresh.</div>';
-          }
+    if (input) input.focus();
+  }, 100);
+}
+
+function collapseSearchbar(searchbar, cfg) {
+  searchbar.style.height = '44px';
+  searchbar.style.minWidth = '280px';
+  searchbar.style.padding = '12px 20px';
+  searchbar.style.flexDirection = 'row';
+  searchbar.style.alignItems = 'center';
+  searchbar.style.borderRadius = '24px';
+  searchbar.style.cursor = 'text';
+
+  setTimeout(() => {
+    searchbar.innerHTML = getSearchbarHTML(cfg);
+  }, 400);
+}
+
+let socket = null;
+let currentConversationId = null;
+
+function initializeInlineChat(cfg, apiUrl) {
+  const messagesContainer = document.getElementById('searchbar-messages');
+  const input = document.getElementById('searchbar-input');
+  const sendBtn = document.getElementById('searchbar-send');
+  const typingIndicator = document.getElementById('searchbar-typing');
+
+  // Initialize Socket.io
+  if (!socket) {
+    socket = io(apiUrl);
+
+    socket.on('connect', () => {
+      // Connection established
+    });
+
+    socket.on('message:new', (data) => {
+      // Ignore own messages to avoid duplication and wrong role assignment
+      if (data.role && data.role.toLowerCase() === 'user') return;
+      appendInlineMessage(data.content, false, cfg);
+    });
+
+    socket.on('ai:thinking', () => {
+      if (typingIndicator) typingIndicator.style.display = 'block';
+    });
+
+    socket.on('ai:response', (data) => {
+      if (typingIndicator) typingIndicator.style.display = 'none';
+      appendInlineMessage(data.content, false, cfg, data.metadata?.sources);
+      if (cfg.soundEnabled) playNotificationSound();
+    });
+  }
+
+  // Create conversation
+  if (!currentConversationId) {
+    fetch(apiUrl + '/api/widgets/config/' + cfg.installCode)
+      .then(res => res.json())
+      .then(widgetData => {
+        return fetch(apiUrl + '/api/chat/conversations/start', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            widgetId: widgetData.id,
+            visitorMetadata: {
+              userAgent: navigator.userAgent,
+              language: navigator.language,
+              referrer: document.referrer,
+              currentUrl: window.location.href
+            }
+          })
         });
-    }
-    
-    function sendMessage() {
-      const message = input.value.trim();
-      if (!message) return;
-      
-      appendInlineMessage(message, true, cfg);
-      input.value = '';
-      
-      socket.emit('message:send', {
+      })
+      .then(res => res.json())
+      .then(data => {
+        currentConversationId = data.id;
+        socket.emit('join:conversation', { conversationId: currentConversationId });
+
+        if (cfg.greeting) {
+          appendInlineMessage(cfg.greeting, false, cfg);
+        }
+      })
+      .catch(err => {
+        console.error('Failed to create conversation:', err);
+        if (messagesContainer) {
+          messagesContainer.innerHTML = '<div style="padding: 20px; text-align: center; color: #ef4444;">Failed to connect. Please refresh.</div>';
+        }
+      });
+  }
+
+  function sendMessage() {
+    const message = input.value.trim();
+    if (!message) return;
+
+    appendInlineMessage(message, true, cfg);
+    input.value = '';
+
+    socket.emit('message:send', {
+      conversationId: currentConversationId,
+      content: message
+    });
+
+    fetch(apiUrl + '/api/chat/messages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
         conversationId: currentConversationId,
-        content: message
-      });
-      
-      fetch(apiUrl + '/api/chat/messages', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          conversationId: currentConversationId,
-          content: message,
-          role: 'USER',
-          currentPageUrl: window.location.href
-        })
-      });
-    }
-    
-    sendBtn.addEventListener('click', sendMessage);
-    input.addEventListener('keypress', (e) => {
-      if (e.key === 'Enter') sendMessage();
+        content: message,
+        role: 'USER',
+        currentPageUrl: window.location.href
+      })
     });
   }
-  
-  function appendInlineMessage(content, isUser, cfg, sources) {
-    const messagesContainer = document.getElementById('searchbar-messages');
-    if (!messagesContainer) return;
-    
-    const msgDiv = document.createElement('div');
-    msgDiv.style.cssText = 'max-width: 80%; padding: 12px 16px; border-radius: ' + (cfg.messageBorderRadius || 12) + 'px; ' +
-      'background: ' + (isUser ? cfg.userMessageColor : cfg.botMessageColor) + '; ' +
-      'color: ' + (isUser ? (cfg.userMessageTextColor || '#ffffff') : (cfg.botMessageTextColor || cfg.messageTextColor)) + '; ' +
-      'align-self: ' + (isUser ? 'flex-end' : 'flex-start') + '; ' +
-      'font-size: 14px; line-height: 1.5; word-wrap: break-word;';
-    msgDiv.textContent = content;
-    
-    if (!isUser && sources && sources.length > 0 && cfg.showSources !== false) {
-      const maxSources = cfg.maxVisibleSources || 3;
-      const visibleSources = sources.slice(0, maxSources);
-      
-      const sourcesDiv = document.createElement('div');
-      sourcesDiv.style.cssText = 'margin-top: 10px; padding-top: 8px; border-top: 1px solid rgba(0,0,0,0.05); display: flex; gap: 8px; flex-wrap: wrap; align-items: center;';
-      
-      // Filter valid sources and create elements
-      let hasValidSource = false;
-      visibleSources.forEach(s => {
-         const url = s.url || s.sourceUrl;
-         if (!url) return;
-         
-         try {
-           hasValidSource = true;
-           const urlObj = new URL(url);
-           const domain = urlObj.hostname;
-           const faviconUrl = 'https://www.google.com/s2/favicons?domain=' + domain + '&sz=64';
-           
-           const link = document.createElement('a');
-           link.href = url;
-           link.target = '_blank';
-           link.title = s.title || s.documentTitle || domain;
-           link.style.cssText = 'display: block; cursor: pointer; text-decoration: none; border-radius: 50%; transition: transform 0.2s;';
-           link.onmouseover = function() { this.style.transform = 'scale(1.15)'; };
-           link.onmouseout = function() { this.style.transform = 'scale(1)'; };
-           
-           const img = document.createElement('img');
-           img.src = faviconUrl;
-           img.alt = s.title || domain;
-           img.style.cssText = 'width: 24px; height: 24px; border-radius: 50%; border: 1px solid rgba(0,0,0,0.1); background: white; object-fit: cover; display: block;';
-           
-           link.appendChild(img);
-           sourcesDiv.appendChild(link);
-         } catch (e) {
-           console.error('AI Chat: Invalid source URL', url);
-         }
-      });
-      
-      if (hasValidSource) {
-        msgDiv.appendChild(sourcesDiv);
+
+  sendBtn.addEventListener('click', sendMessage);
+  input.addEventListener('keypress', (e) => {
+    if (e.key === 'Enter') sendMessage();
+  });
+}
+
+function appendInlineMessage(content, isUser, cfg, sources) {
+  const messagesContainer = document.getElementById('searchbar-messages');
+  if (!messagesContainer) return;
+
+  const msgDiv = document.createElement('div');
+  msgDiv.style.cssText = 'max-width: 80%; padding: 12px 16px; border-radius: ' + (cfg.messageBorderRadius || 12) + 'px; ' +
+    'background: ' + (isUser ? cfg.userMessageColor : cfg.botMessageColor) + '; ' +
+    'color: ' + (isUser ? (cfg.userMessageTextColor || '#ffffff') : (cfg.botMessageTextColor || cfg.messageTextColor)) + '; ' +
+    'align-self: ' + (isUser ? 'flex-end' : 'flex-start') + '; ' +
+    'font-size: 14px; line-height: 1.5; word-wrap: break-word;';
+  msgDiv.textContent = content;
+
+  if (!isUser && sources && sources.length > 0 && cfg.showSources !== false) {
+    const maxSources = cfg.maxVisibleSources || 3;
+    const visibleSources = sources.slice(0, maxSources);
+
+    const sourcesDiv = document.createElement('div');
+    sourcesDiv.style.cssText = 'margin-top: 10px; padding-top: 8px; border-top: 1px solid rgba(0,0,0,0.05); display: flex; gap: 8px; flex-wrap: wrap; align-items: center;';
+
+    // Filter valid sources and create elements
+    let hasValidSource = false;
+    visibleSources.forEach(s => {
+      const url = s.url || s.sourceUrl;
+      if (!url) return;
+
+      try {
+        hasValidSource = true;
+        const urlObj = new URL(url);
+        const domain = urlObj.hostname;
+        const faviconUrl = 'https://www.google.com/s2/favicons?domain=' + domain + '&sz=64';
+
+        const link = document.createElement('a');
+        link.href = url;
+        link.target = '_blank';
+        link.title = s.title || s.documentTitle || domain;
+        link.style.cssText = 'display: block; cursor: pointer; text-decoration: none; border-radius: 50%; transition: transform 0.2s;';
+        link.onmouseover = function () { this.style.transform = 'scale(1.15)'; };
+        link.onmouseout = function () { this.style.transform = 'scale(1)'; };
+
+        const img = document.createElement('img');
+        img.src = faviconUrl;
+        img.alt = s.title || domain;
+        img.style.cssText = 'width: 24px; height: 24px; border-radius: 50%; border: 1px solid rgba(0,0,0,0.1); background: white; object-fit: cover; display: block;';
+
+        link.appendChild(img);
+        sourcesDiv.appendChild(link);
+      } catch (e) {
+        console.error('AI Chat: Invalid source URL', url);
       }
+    });
+
+    if (hasValidSource) {
+      msgDiv.appendChild(sourcesDiv);
     }
-    
-    messagesContainer.appendChild(msgDiv);
-    messagesContainer.scrollTop = messagesContainer.scrollHeight;
   }
-  
-  function initializeChat(cfg, apiUrl) {
-    const messagesContainer = document.getElementById('ai-chat-messages');
-    const input = document.getElementById('ai-chat-input');
-    const sendBtn = document.getElementById('ai-chat-send');
-    const typingIndicator = document.getElementById('ai-chat-typing');
-    
-    // Initialize Socket.io
-    if (!socket) {
-      socket = io(apiUrl);
-      
-      socket.on('connect', () => {
-        // Connection established - no logging needed in widget
-      });
-      
-      socket.on('message:new', (data) => {
-        // Ignore own messages to avoid duplication and wrong role assignment
-        if (data.role && data.role.toLowerCase() === 'user') return;
-        appendMessage(data.content, false, cfg);
-      });
-      
-      socket.on('ai:thinking', () => {
-        typingIndicator.style.display = 'block';
-      });
-      
-      socket.on('ai:response', (data) => {
-        typingIndicator.style.display = 'none';
-        appendMessage(data.content, false, cfg, data.metadata?.sources);
-        if (cfg.soundEnabled) playNotificationSound();
-      });
-    }
-    
-    // Create conversation on first load
-    if (!currentConversationId) {
-      // First, get the full widget config to find widgetId
-      fetch(apiUrl + '/api/widgets/config/' + cfg.installCode)
-        .then(res => res.json())
-        .then(widgetData => {
-          // Get widgetId from config endpoint
-          const widgetId = widgetData.id || cfg.installCode; // fallback to installCode if id not present
-          
-          // Now create conversation with correct endpoint
-          return fetch(apiUrl + '/api/chat/conversations/start', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              widgetId: widgetId,
-              visitorMetadata: {
-                userAgent: navigator.userAgent,
-                language: navigator.language,
-                referrer: document.referrer,
-                currentUrl: window.location.href
-              }
-            })
-          });
-        })
-        .then(res => res.json())
-        .then(data => {
-          currentConversationId = data.id;
-          socket.emit('join:conversation', { conversationId: currentConversationId });
-          
-          // Show greeting from widget config or conversation greeting
-          if (cfg.greeting) {
-            appendMessage(cfg.greeting, false, cfg);
-          }
-          
-          // Show suggested questions
-          if (cfg.suggestedQuestions && cfg.suggestedQuestions.length > 0) {
-            showSuggestedQuestions(cfg.suggestedQuestions, cfg);
-          }
-        })
-        .catch(err => {
-          console.error('Failed to create conversation:', err);
-          messagesContainer.innerHTML = '<div style="padding: 20px; text-align: center; color: #ef4444;">Failed to connect. Please refresh the page.</div>';
+
+  messagesContainer.appendChild(msgDiv);
+  messagesContainer.scrollTop = messagesContainer.scrollHeight;
+}
+
+function initializeChat(cfg, apiUrl) {
+  const messagesContainer = document.getElementById('ai-chat-messages');
+  const input = document.getElementById('ai-chat-input');
+  const sendBtn = document.getElementById('ai-chat-send');
+  const typingIndicator = document.getElementById('ai-chat-typing');
+
+  // Initialize Socket.io
+  if (!socket) {
+    socket = io(apiUrl);
+
+    socket.on('connect', () => {
+      // Connection established - no logging needed in widget
+    });
+
+    socket.on('message:new', (data) => {
+      // Ignore own messages to avoid duplication and wrong role assignment
+      if (data.role && data.role.toLowerCase() === 'user') return;
+      appendMessage(data.content, false, cfg);
+    });
+
+    socket.on('ai:thinking', () => {
+      typingIndicator.style.display = 'block';
+    });
+
+    socket.on('ai:response', (data) => {
+      typingIndicator.style.display = 'none';
+      appendMessage(data.content, false, cfg, data.metadata?.sources);
+      if (cfg.soundEnabled) playNotificationSound();
+    });
+  }
+
+  // Create conversation on first load
+  if (!currentConversationId) {
+    // First, get the full widget config to find widgetId
+    fetch(apiUrl + '/api/widgets/config/' + cfg.installCode)
+      .then(res => res.json())
+      .then(widgetData => {
+        // Get widgetId from config endpoint
+        const widgetId = widgetData.id || cfg.installCode; // fallback to installCode if id not present
+
+        // Now create conversation with correct endpoint
+        return fetch(apiUrl + '/api/chat/conversations/start', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            widgetId: widgetId,
+            visitorMetadata: {
+              userAgent: navigator.userAgent,
+              language: navigator.language,
+              referrer: document.referrer,
+              currentUrl: window.location.href
+            }
+          })
         });
-    }
-    
-    function sendMessage() {
-      const message = input.value.trim();
-      if (!message) return;
-      
-      appendMessage(message, true, cfg);
-      input.value = '';
-      
-      // Send via Socket.io
-      socket.emit('message:send', {
+      })
+      .then(res => res.json())
+      .then(data => {
+        currentConversationId = data.id;
+        socket.emit('join:conversation', { conversationId: currentConversationId });
+
+        // Show greeting from widget config or conversation greeting
+        if (cfg.greeting) {
+          appendMessage(cfg.greeting, false, cfg);
+        }
+
+        // Show suggested questions
+        if (cfg.suggestedQuestions && cfg.suggestedQuestions.length > 0) {
+          showSuggestedQuestions(cfg.suggestedQuestions, cfg);
+        }
+      })
+      .catch(err => {
+        console.error('Failed to create conversation:', err);
+        messagesContainer.innerHTML = '<div style="padding: 20px; text-align: center; color: #ef4444;">Failed to connect. Please refresh the page.</div>';
+      });
+  }
+
+  function sendMessage() {
+    const message = input.value.trim();
+    if (!message) return;
+
+    appendMessage(message, true, cfg);
+    input.value = '';
+
+    // Send via Socket.io
+    socket.emit('message:send', {
+      conversationId: currentConversationId,
+      content: message
+    });
+
+    // Also send via REST API for persistence with current page URL
+    fetch(apiUrl + '/api/chat/messages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
         conversationId: currentConversationId,
-        content: message
-      });
-      
-      // Also send via REST API for persistence with current page URL
-      fetch(apiUrl + '/api/chat/messages', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          conversationId: currentConversationId,
-          content: message,
-          role: 'USER',
-          currentPageUrl: window.location.href
-        })
-      });
-    }
-    
-    sendBtn.addEventListener('click', sendMessage);
-    input.addEventListener('keypress', (e) => {
-      if (e.key === 'Enter') sendMessage();
-    });
-    
-    // Typing indicator
-    let typingTimeout;
-    input.addEventListener('input', () => {
-      socket.emit('typing:start', { conversationId: currentConversationId });
-      clearTimeout(typingTimeout);
-      typingTimeout = setTimeout(() => {
-        socket.emit('typing:stop', { conversationId: currentConversationId });
-      }, 1000);
+        content: message,
+        role: 'USER',
+        currentPageUrl: window.location.href
+      })
     });
   }
-  
-  function appendMessage(content, isUser, cfg, sources) {
-    const messagesContainer = document.getElementById('ai-chat-messages');
-    const msgDiv = document.createElement('div');
-    msgDiv.style.cssText = 'max-width: 80%; padding: 12px 16px; border-radius: ' + cfg.messageBorderRadius + 'px; ' +
-      'background: ' + (isUser ? cfg.userMessageColor : cfg.botMessageColor) + '; ' +
-      'color: ' + (isUser ? (cfg.userMessageTextColor || '#ffffff') : (cfg.botMessageTextColor || cfg.messageTextColor)) + '; ' +
-      'align-self: ' + (isUser ? 'flex-end' : 'flex-start') + '; ' +
-      'font-size: 15px; line-height: 1.5; word-wrap: break-word; ' +
-      'box-shadow: 0 1px 2px rgba(0,0,0,0.05); ' +
-      'animation: slideIn 0.3s ease-out;';
-    msgDiv.textContent = content;
-    
-    // Add sources if available (for AI messages)
-    if (!isUser && sources && sources.length > 0 && cfg.showSources !== false) {
-      const maxSources = cfg.maxVisibleSources || 3;
-      const visibleSources = sources.slice(0, maxSources);
-      
-      const sourcesDiv = document.createElement('div');
-      sourcesDiv.style.cssText = 'margin-top: 10px; padding-top: 8px; border-top: 1px solid rgba(0,0,0,0.05); display: flex; gap: 8px; flex-wrap: wrap; align-items: center;';
-      
-      let hasValidSource = false;
-      visibleSources.forEach(s => {
-         const url = s.url || s.sourceUrl;
-         if (!url) return;
-         
-         try {
-           hasValidSource = true;
-           const urlObj = new URL(url);
-           const domain = urlObj.hostname;
-           const faviconUrl = 'https://www.google.com/s2/favicons?domain=' + domain + '&sz=64';
-           
-           const link = document.createElement('a');
-           link.href = url;
-           link.target = '_blank';
-           link.title = s.title || s.documentTitle || domain;
-           link.style.cssText = 'display: block; cursor: pointer; text-decoration: none; border-radius: 50%; transition: transform 0.2s;';
-           link.onmouseover = function() { this.style.transform = 'scale(1.15)'; };
-           link.onmouseout = function() { this.style.transform = 'scale(1)'; };
-           
-           const img = document.createElement('img');
-           img.src = faviconUrl;
-           img.alt = s.title || domain;
-           img.style.cssText = 'width: 24px; height: 24px; border-radius: 50%; border: 1px solid rgba(0,0,0,0.1); background: white; object-fit: cover; display: block;';
-           
-           link.appendChild(img);
-           sourcesDiv.appendChild(link);
-         } catch (e) {
-           console.error('AI Chat: Invalid source URL', url);
-         }
-      });
-      
-      if (hasValidSource) {
-        msgDiv.appendChild(sourcesDiv);
+
+  sendBtn.addEventListener('click', sendMessage);
+  input.addEventListener('keypress', (e) => {
+    if (e.key === 'Enter') sendMessage();
+  });
+
+  // Typing indicator
+  let typingTimeout;
+  input.addEventListener('input', () => {
+    socket.emit('typing:start', { conversationId: currentConversationId });
+    clearTimeout(typingTimeout);
+    typingTimeout = setTimeout(() => {
+      socket.emit('typing:stop', { conversationId: currentConversationId });
+    }, 1000);
+  });
+}
+
+function appendMessage(content, isUser, cfg, sources) {
+  const messagesContainer = document.getElementById('ai-chat-messages');
+  const msgDiv = document.createElement('div');
+  msgDiv.style.cssText = 'max-width: 80%; padding: 12px 16px; border-radius: ' + cfg.messageBorderRadius + 'px; ' +
+    'background: ' + (isUser ? cfg.userMessageColor : cfg.botMessageColor) + '; ' +
+    'color: ' + (isUser ? (cfg.userMessageTextColor || '#ffffff') : (cfg.botMessageTextColor || cfg.messageTextColor)) + '; ' +
+    'align-self: ' + (isUser ? 'flex-end' : 'flex-start') + '; ' +
+    'font-size: 15px; line-height: 1.5; word-wrap: break-word; ' +
+    'box-shadow: 0 1px 2px rgba(0,0,0,0.05); ' +
+    'animation: slideIn 0.3s ease-out;';
+  msgDiv.textContent = content;
+
+  // Add sources if available (for AI messages)
+  if (!isUser && sources && sources.length > 0 && cfg.showSources !== false) {
+    const maxSources = cfg.maxVisibleSources || 3;
+    const visibleSources = sources.slice(0, maxSources);
+
+    const sourcesDiv = document.createElement('div');
+    sourcesDiv.style.cssText = 'margin-top: 10px; padding-top: 8px; border-top: 1px solid rgba(0,0,0,0.05); display: flex; gap: 8px; flex-wrap: wrap; align-items: center;';
+
+    let hasValidSource = false;
+    visibleSources.forEach(s => {
+      const url = s.url || s.sourceUrl;
+      if (!url) return;
+
+      try {
+        hasValidSource = true;
+        const urlObj = new URL(url);
+        const domain = urlObj.hostname;
+        const faviconUrl = 'https://www.google.com/s2/favicons?domain=' + domain + '&sz=64';
+
+        const link = document.createElement('a');
+        link.href = url;
+        link.target = '_blank';
+        link.title = s.title || s.documentTitle || domain;
+        link.style.cssText = 'display: block; cursor: pointer; text-decoration: none; border-radius: 50%; transition: transform 0.2s;';
+        link.onmouseover = function () { this.style.transform = 'scale(1.15)'; };
+        link.onmouseout = function () { this.style.transform = 'scale(1)'; };
+
+        const img = document.createElement('img');
+        img.src = faviconUrl;
+        img.alt = s.title || domain;
+        img.style.cssText = 'width: 24px; height: 24px; border-radius: 50%; border: 1px solid rgba(0,0,0,0.1); background: white; object-fit: cover; display: block;';
+
+        link.appendChild(img);
+        sourcesDiv.appendChild(link);
+      } catch (e) {
+        console.error('AI Chat: Invalid source URL', url);
       }
-    }
-    
-    messagesContainer.appendChild(msgDiv);
-    messagesContainer.scrollTop = messagesContainer.scrollHeight;
-  }
-  
-  function showSuggestedQuestions(questions, cfg) {
-    const messagesContainer = document.getElementById('ai-chat-messages');
-    const container = document.createElement('div');
-    container.style.cssText = 'display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px;';
-    
-    questions.forEach(q => {
-      const btn = document.createElement('button');
-      btn.textContent = q;
-      btn.style.cssText = 'padding: 8px 12px; background: white; border: 1px solid ' + cfg.primaryColor + '; ' +
-        'color: ' + cfg.primaryColor + '; border-radius: 16px; font-size: 13px; cursor: pointer; ' +
-        'transition: all 0.2s;';
-      btn.addEventListener('click', () => {
-        document.getElementById('ai-chat-input').value = q;
-        document.getElementById('ai-chat-send').click();
-      });
-      container.appendChild(btn);
     });
-    
-    messagesContainer.appendChild(container);
+
+    if (hasValidSource) {
+      msgDiv.appendChild(sourcesDiv);
+    }
   }
-  
-  function playNotificationSound() {
-    // Simple beep sound
-    const audio = new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvmwhBTGH0fPTgjMGHm7A7+OZUQ0PVKzn77BhGAdFnuHyvmYdBTGB0fPTgjMGHm7A7+OZUQ0PVKzn77BhGAdFnuHyvmYdBTGB0fPTgjMGHm7A7+OZUQ0PVKzn77BhGAdFnuHyvmYdBTGB0fPTgjMGHm7A7+OZUQ0PVKzn77BhGAdFnuHyvmYdBTGB0fPTgjMGHm7A7+OZUQ0PVKzn77BhGAdFnuHyvmYdBTGB0fPTgjMGHm7A7+OZUQ0PVKzn77BhGAdFnuHyvmYdBTGB0fPTgjMGHm7A7+OZUQ0PVKzn77BhGAdFnuHyvmYdBTGB0fPTgjMGHm7A7+OZUQ0PVKzn77BhGAdFnuHyvmYdBTGB0fPTgjMGHm7A7+OZUQ0PVKzn77BhGAdFnuHyvmYdBTGB0fPTgjMGHm7A7+OZUQ0PVKzn77BhGAdFnuHyvmYdBTGB0fPTgjMGHm7A7+OZUQ0PVKzn77BhGAdFnuHyv2YdBTGB0fPTgjMGHm7A7+OZUQ0PVKzn77BhGAdFnuHyvmYdBTGB0fPTgjMGHm7A7+OZUQ0PVKzn77BhGAdFnuHyvmYdBTGB0fPTgjMGHm7A7+OZUQ0PVKzn77BhGAdFnuHyvmYdBTGB0fPTgjMGHm7A7+OZUQ0PVKzn77BhGAdFnuHyvmYdBTGB0fPTgjMGHm7A7+OZUQ0PVKzn77BhGAdFnuHyvmYdBTGB0fPTgjMGHm7A7+OZUQ0PVKzn77BhGAdFnuHyvmYdBTGB0fPTgjMGHm7A7+OZUQ0PVKzn77BhGAdFnuHyvmYdBTGB0fPTgjMGHm7A7+OZUQ0PVKzn77BhGAdFnuHyvmYdBTGB0fPTgjMGHm7A7+OZUQ0PVKzn77BhGAdFnuHyvmYdBTGB0fPTgjMGHm7A7+OZUQ0PVKzn77BhGAdFnuHyvmYdBTGB0fPTgjMGHm7A7+OZUQ0PVKzn77BhGAdFnuHyvmYdBTGB0fPTgjMGHm7A7+OZUQ0PVKzn77BhGAdFnuHyvmYdBTGB0fPTgjMGHm7A7+OZUQ0PVKzn77BhGAdFnuHyvmYdBTGB0fPTgjMGHm7A7+OZUQ0PVKzn77BhGAdFnuHyvmYdBTGB0fPTgjMGHm7A7+OZUQ0PVKzn77BhGAdFnuHyvmYdBTGB0fPTgjMGHm7A7+OZUQ0PVKzn77BhGAdFnuHyvmYdBTGB0fPTgjMGHm7A7+OZUQ0PVKzn77BhGAdFnuHyvmYdBTGB0fPTgjMGHm7A7+OZUQ0PVKzn77BhGAZFnuHyvmUhBTGB0fPTgzQIHm7A7+OZUA8PVKzn77BiGAZFnuHyvmUhBTGB0fPTgzQIHm7A7+OZUA8PVKzn77BiGAZFnuHyvmUhBTGB0fPTgzQIHm7A7+OZUA8PVKzn77BiGAZFnuHyvmUhBTGB0fPTgzQIHm7A7+OZUA8PVKzn77BiGAZFnuHyvmUhBTGB0fPTgzQIHm7A7+OZUA8PVKzn77BiGAZFnuHyvmUhBTGB0fPTgzQIHm7A7+OZUA8PVKzn77BiGAZFnuHyvmUhBTGB0fPTgzQIHm7A7+OZUA8PVKzn77BiGAZFnuHyvmUhBTGB0fPTgzQIHm7A7+OZUA8PVKzn77BiGAZFnuHyvmUhBTGB0fPTgzQIHm7A7+OZUA8PVKzn77BiGAZFnuHyvmUhBTGB0fPTgzQIHm7A7+OZUA8PVKzn77BiGA');
-    audio.volume = 0.3;
-    audio.play().catch(() => {});
-  }
-  
-  // Load Socket.io client
-  const script = document.createElement('script');
-  script.src = 'https://cdn.socket.io/4.6.1/socket.io.min.js';
-  document.head.appendChild(script);
-})();
+
+  messagesContainer.appendChild(msgDiv);
+  messagesContainer.scrollTop = messagesContainer.scrollHeight;
+}
+
+function showSuggestedQuestions(questions, cfg) {
+  const messagesContainer = document.getElementById('ai-chat-messages');
+  const container = document.createElement('div');
+  container.style.cssText = 'display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px;';
+
+  questions.forEach(q => {
+    const btn = document.createElement('button');
+    btn.textContent = q;
+    btn.style.cssText = 'padding: 8px 12px; background: white; border: 1px solid ' + cfg.primaryColor + '; ' +
+      'color: ' + cfg.primaryColor + '; border-radius: 16px; font-size: 13px; cursor: pointer; ' +
+      'transition: all 0.2s;';
+    btn.addEventListener('click', () => {
+      document.getElementById('ai-chat-input').value = q;
+      document.getElementById('ai-chat-send').click();
+    });
+    container.appendChild(btn);
+  });
+
+  messagesContainer.appendChild(container);
+}
+
+function playNotificationSound() {
+  // Simple beep sound
+  const audio = new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvmwhBTGH0fPTgjMGHm7A7+OZUQ0PVKzn77BhGAdFnuHyvmYdBTGB0fPTgjMGHm7A7+OZUQ0PVKzn77BhGAdFnuHyvmYdBTGB0fPTgjMGHm7A7+OZUQ0PVKzn77BhGAdFnuHyvmYdBTGB0fPTgjMGHm7A7+OZUQ0PVKzn77BhGAdFnuHyvmYdBTGB0fPTgjMGHm7A7+OZUQ0PVKzn77BhGAdFnuHyvmYdBTGB0fPTgjMGHm7A7+OZUQ0PVKzn77BhGAdFnuHyvmYdBTGB0fPTgjMGHm7A7+OZUQ0PVKzn77BhGAdFnuHyvmYdBTGB0fPTgjMGHm7A7+OZUQ0PVKzn77BhGAdFnuHyvmYdBTGB0fPTgjMGHm7A7+OZUQ0PVKzn77BhGAdFnuHyvmYdBTGB0fPTgjMGHm7A7+OZUQ0PVKzn77BhGAdFnuHyvmYdBTGB0fPTgjMGHm7A7+OZUQ0PVKzn77BhGAdFnuHyv2YdBTGB0fPTgjMGHm7A7+OZUQ0PVKzn77BhGAdFnuHyvmYdBTGB0fPTgjMGHm7A7+OZUQ0PVKzn77BhGAdFnuHyvmYdBTGB0fPTgjMGHm7A7+OZUQ0PVKzn77BhGAdFnuHyvmYdBTGB0fPTgjMGHm7A7+OZUQ0PVKzn77BhGAdFnuHyvmYdBTGB0fPTgjMGHm7A7+OZUQ0PVKzn77BhGAdFnuHyvmYdBTGB0fPTgjMGHm7A7+OZUQ0PVKzn77BhGAdFnuHyvmYdBTGB0fPTgjMGHm7A7+OZUQ0PVKzn77BhGAdFnuHyvmYdBTGB0fPTgjMGHm7A7+OZUQ0PVKzn77BhGAdFnuHyvmYdBTGB0fPTgjMGHm7A7+OZUQ0PVKzn77BhGAdFnuHyvmYdBTGB0fPTgjMGHm7A7+OZUQ0PVKzn77BhGAdFnuHyvmYdBTGB0fPTgjMGHm7A7+OZUQ0PVKzn77BhGAdFnuHyvmYdBTGB0fPTgjMGHm7A7+OZUQ0PVKzn77BhGAdFnuHyvmYdBTGB0fPTgjMGHm7A7+OZUQ0PVKzn77BhGAdFnuHyvmYdBTGB0fPTgjMGHm7A7+OZUQ0PVKzn77BhGAdFnuHyvmYdBTGB0fPTgjMGHm7A7+OZUQ0PVKzn77BhGAdFnuHyvmYdBTGB0fPTgjMGHm7A7+OZUQ0PVKzn77BhGAdFnuHyvmYdBTGB0fPTgjMGHm7A7+OZUQ0PVKzn77BhGAdFnuHyvmYdBTGB0fPTgjMGHm7A7+OZUQ0PVKzn77BhGAZFnuHyvmUhBTGB0fPTgzQIHm7A7+OZUA8PVKzn77BiGAZFnuHyvmUhBTGB0fPTgzQIHm7A7+OZUA8PVKzn77BiGAZFnuHyvmUhBTGB0fPTgzQIHm7A7+OZUA8PVKzn77BiGAZFnuHyvmUhBTGB0fPTgzQIHm7A7+OZUA8PVKzn77BiGAZFnuHyvmUhBTGB0fPTgzQIHm7A7+OZUA8PVKzn77BiGAZFnuHyvmUhBTGB0fPTgzQIHm7A7+OZUA8PVKzn77BiGAZFnuHyvmUhBTGB0fPTgzQIHm7A7+OZUA8PVKzn77BiGAZFnuHyvmUhBTGB0fPTgzQIHm7A7+OZUA8PVKzn77BiGAZFnuHyvmUhBTGB0fPTgzQIHm7A7+OZUA8PVKzn77BiGAZFnuHyvmUhBTGB0fPTgzQIHm7A7+OZUA8PVKzn77BiGA');
+  audio.volume = 0.3;
+  audio.play().catch(() => { });
+}
+
+// Load Socket.io client
+const script = document.createElement('script');
+script.src = 'https://cdn.socket.io/4.6.1/socket.io.min.js';
+document.head.appendChild(script);
+}) ();
 `;
 }
