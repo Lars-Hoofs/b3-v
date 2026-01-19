@@ -159,6 +159,74 @@ export const createWidgetSchema = z.object({
   brandingText: z.string().max(100).optional(),
   brandingUrl: z.string().url().optional(),
 
+  // Sources Display
+  showSources: z.boolean().optional(),
+  maxVisibleSources: z.number().int().min(1).max(10).optional(),
+
+  // Typography System (NEW)
+  fontFamily: z.string().max(100).optional(), // Google Fonts name
+  fontSize: z.object({
+    header: z.number().int().min(12).max(32).optional(),
+    message: z.number().int().min(10).max(20).optional(),
+    input: z.number().int().min(10).max(18).optional(),
+  }).optional(),
+  fontWeight: z.object({
+    header: z.number().int().min(100).max(900).optional(),
+    message: z.number().int().min(100).max(900).optional(),
+    input: z.number().int().min(100).max(900).optional(),
+  }).optional(),
+  lineHeight: z.object({
+    header: z.number().min(1).max(2).optional(),
+    message: z.number().min(1).max(2).optional(),
+    input: z.number().min(1).max(2).optional(),
+  }).optional(),
+  letterSpacing: z.object({
+    header: z.number().min(-0.1).max(0.2).optional(),
+    message: z.number().min(-0.1).max(0.2).optional(),
+    input: z.number().min(-0.1).max(0.2).optional(),
+  }).optional(),
+
+  // Avatar Gradient (NEW)
+  avatarGradient: z.object({
+    from: z.string().regex(/^#[0-9A-Fa-f]{6}$/),
+    to: z.string().regex(/^#[0-9A-Fa-f]{6}$/),
+    direction: z.string(),
+  }).optional(),
+  avatarBorderColor: z.string().regex(/^#[0-9A-Fa-f]{6}$/).optional(),
+  avatarBorderWidth: z.number().int().min(0).max(10).optional(),
+  avatarSize: z.number().int().min(32).max(80).optional(),
+
+  // File Attachment Styling (NEW)
+  attachmentStyle: z.object({
+    backgroundColor: z.string().regex(/^#[0-9A-Fa-f]{6}$/).optional(),
+    borderRadius: z.number().int().min(0).max(20).optional(),
+    iconColor: z.string().regex(/^#[0-9A-Fa-f]{6}$/).optional(),
+  }).optional(),
+  showAttachmentPreviews: z.boolean().optional(),
+  attachmentIconStyle: z.enum(["modern", "minimal", "colorful"]).optional(),
+
+  // GSAP Animation Options (NEW)
+  gsapEnabled: z.boolean().optional(),
+  gsapBubbleEntry: z.enum(["bounceIn", "fadeInUp", "scaleIn", "rotateIn", "none"]).optional(),
+  gsapChatEntry: z.enum(["slideInRight", "fadeIn", "zoomIn", "slideInUp", "none"]).optional(),
+  gsapMessageEntry: z.enum(["fadeInUp", "slideInLeft", "fadeIn", "none"]).optional(),
+  gsapDuration: z.number().min(0.1).max(3).optional(), // in seconds
+  gsapEase: z.string().max(50).optional(), // GSAP easing function name
+
+  // Message Bubble Enhancements (NEW)
+  messageShadow: z.string().max(200).optional(),
+  messageSpacing: z.number().int().min(4).max(32).optional(),
+  messageMaxWidth: z.number().int().min(50).max(100).optional(), // percentage
+
+  // Header Enhancements (NEW)
+  headerGradient: z.object({
+    from: z.string().regex(/^#[0-9A-Fa-f]{6}$/),
+    to: z.string().regex(/^#[0-9A-Fa-f]{6}$/),
+    direction: z.string(),
+  }).optional(),
+  headerShadow: z.string().max(200).optional(),
+  headerPadding: z.number().int().min(8).max(40).optional(),
+
   // Advanced
   customCss: z.string().max(10000).optional(),
   customJs: z.string().max(10000).optional(),
@@ -432,6 +500,46 @@ router.get("/config/:installCode", async (req, res) => {
       showBranding: widget.showBranding,
       brandingText: widget.brandingText,
       brandingUrl: widget.brandingUrl,
+
+      // Sources Display
+      showSources: widget.showSources,
+      maxVisibleSources: widget.maxVisibleSources,
+
+      // Typography System (NEW)
+      fontFamily: widget.fontFamily,
+      fontSize: widget.fontSize,
+      fontWeight: widget.fontWeight,
+      lineHeight: widget.lineHeight,
+      letterSpacing: widget.letterSpacing,
+
+      // Avatar Gradient (NEW)
+      avatarGradient: widget.avatarGradient,
+      avatarBorderColor: widget.avatarBorderColor,
+      avatarBorderWidth: widget.avatarBorderWidth,
+      avatarSize: widget.avatarSize,
+
+      // File Attachment Styling (NEW)
+      attachmentStyle: widget.attachmentStyle,
+      showAttachmentPreviews: widget.showAttachmentPreviews,
+      attachmentIconStyle: widget.attachmentIconStyle,
+
+      // GSAP Animation Options (NEW)
+      gsapEnabled: widget.gsapEnabled,
+      gsapBubbleEntry: widget.gsapBubbleEntry,
+      gsapChatEntry: widget.gsapChatEntry,
+      gsapMessageEntry: widget.gsapMessageEntry,
+      gsapDuration: widget.gsapDuration,
+      gsapEase: widget.gsapEase,
+
+      // Message Bubble Enhancements (NEW)
+      messageShadow: widget.messageShadow,
+      messageSpacing: widget.messageSpacing,
+      messageMaxWidth: widget.messageMaxWidth,
+
+      // Header Enhancements (NEW)
+      headerGradient: widget.headerGradient,
+      headerShadow: widget.headerShadow,
+      headerPadding: widget.headerPadding,
 
       // Advanced
       customCss: widget.customCss,

@@ -475,6 +475,42 @@ model Widget {
   showSources      Boolean   @default(true)
   maxVisibleSources Int      @default(3)
   
+  // Typography System
+  fontFamily        String?   // e.g., "Inter", "Roboto", "Outfit" (Google Fonts)
+  fontSize          Json?     // { header: 18, message: 14, input: 14 } in pixels
+  fontWeight        Json?     // { header: 700, message: 400, input: 400 }
+  lineHeight        Json?     // { header: 1.4, message: 1.6, input: 1.5 }
+  letterSpacing     Json?     // { header: -0.02, message: 0, input: 0 } in em
+  
+  // Avatar Gradient (like screenshot)
+  avatarGradient    Json?     // { from: "#ff6b6b", to: "#feca57", direction: "to-br" }
+  avatarBorderColor String?   // Border around avatar
+  avatarBorderWidth Int?      // Avatar border width in pixels
+  avatarSize        Int?      // Avatar size in pixels (default: 44)
+  
+  // File Attachment Styling
+  attachmentStyle   Json?     // { backgroundColor: "#f3f4f6", borderRadius: 8, iconColor: "#6366f1" }
+  showAttachmentPreviews Boolean @default(true)
+  attachmentIconStyle String? // "modern", "minimal", "colorful"
+  
+  // GSAP Animation Options
+  gsapEnabled       Boolean   @default(false)
+  gsapBubbleEntry   String?   // "bounceIn", "fadeInUp", "scaleIn", "rotateIn"
+  gsapChatEntry     String?   // "slideInRight", "fadeIn", "zoomIn"
+  gsapMessageEntry  String?   // "fadeInUp", "slideInLeft" for messages
+  gsapDuration      Float?    @default(0.6) // Animation duration in seconds
+  gsapEase          String?   @default("power2.out") // GSAP easing function
+  
+  // Message Bubble Enhancements
+  messageShadow     String?   // Shadow for message bubbles
+  messageSpacing    Int?      @default(12) // Gap between messages in pixels
+  messageMaxWidth   Int?      @default(80) // Max width percentage (1-100)
+  
+  // Header Enhancements
+  headerGradient    Json?     // { from: "#xxx", to: "#xxx", direction: "to-r" }
+  headerShadow      String?   // Header shadow
+  headerPadding     Int?      @default(20) // Header padding in pixels
+  
   // Status
   isActive      Boolean   @default(true)
   installCode   String    @unique // Unique install code
