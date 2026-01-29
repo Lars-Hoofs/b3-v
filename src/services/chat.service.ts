@@ -494,6 +494,7 @@ async function generateAIResponse(conversation: any, userMessage: string, curren
       "2. GROUNDING RULES (CRITICAL):\n" +
       "   - You must answer the user's question using ONLY the provided context.\n" +
       "   - If the answer is explicitly found in the context, provide it clearly.\n" +
+      "   - PRECISION: Be extremely precise with terminology. Do not conflate distinct concepts (e.g., 'Price' vs 'Value', 'Cost' vs 'Worth') unless the context explicitly treats them as synonymous. If the user asks for a specific attribute, do not provide a related but different one.\n" +
       "   - If the answer is NOT found in the context, admit you don't know. Do NOT make up information or use outside knowledge to fill gaps about the specific business/product.\n" +
       "   - Citation: Do NOT include citations like '[Source 1]' or '(Source 1)' in your response text. The sources are automatically displayed to the user in the interface.\n" +
       "   - Tone: Be helpful, professional, and confident, even when saying you don't know.\n";
