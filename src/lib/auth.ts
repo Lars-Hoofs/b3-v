@@ -97,8 +97,8 @@ export const auth = betterAuth({
       options: {
         httpOnly: true,
         sameSite: "lax",  // ✅ 'lax' werkt voor cross-subdomain (strict niet)
-        secure: process.env.NODE_ENV === "production",
-        domain: process.env.NODE_ENV === "production" ? ".bonsaimedia.nl" : undefined,  // ✅ Parent domain voor ai + api
+        secure: (process.env.BETTER_AUTH_URL || "").startsWith("https") || process.env.NODE_ENV === "production",
+        domain: (process.env.BETTER_AUTH_URL || "").includes("bonsaimedia.nl") ? ".bonsaimedia.nl" : (process.env.NODE_ENV === "production" ? ".bonsaimedia.nl" : undefined),
         path: "/",
       },
     },
