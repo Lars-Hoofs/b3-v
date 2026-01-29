@@ -86,9 +86,10 @@ export const auth = betterAuth({
     },
     cookiePrefix: "enterprise",
     crossSubDomainCookies: {
-      enabled: true,  // ✅ Enable voor ai.bonsaimedia.nl ↔ api.bonsaimedia.nl
+      enabled: true,
+      domain: (process.env.BETTER_AUTH_URL || "").includes("bonsaimedia.nl") ? ".bonsaimedia.nl" : undefined,
     },
-    useSecureCookies: process.env.NODE_ENV === "production",
+    useSecureCookies: (process.env.BETTER_AUTH_URL || "").startsWith("https") || process.env.NODE_ENV === "production",
     disableCSRFCheck: process.env.NODE_ENV === "development",
   },
   cookies: {
@@ -96,9 +97,9 @@ export const auth = betterAuth({
       name: "enterprise.session_token",
       options: {
         httpOnly: true,
-        sameSite: "lax",  // ✅ 'lax' werkt voor cross-subdomain (strict niet)
-        secure: (process.env.BETTER_AUTH_URL || "").startsWith("https") || process.env.NODE_ENV === "production",
-        domain: (process.env.BETTER_AUTH_URL || "").includes("bonsaimedia.nl") ? ".bonsaimedia.nl" : (process.env.NODE_ENV === "production" ? ".bonsaimedia.nl" : undefined),
+        sameSite: "lax",
+        secure: (process.env.BETTER_AUTH_URL || "").includes("bonsaimedia.nl") || process.env.NODE_ENV === "production",
+        domain: (process.env.BETTER_AUTH_URL || "").includes("bonsaimedia.nl") ? ".bonsaimedia.nl" : undefined,
         path: "/",
       },
     },
