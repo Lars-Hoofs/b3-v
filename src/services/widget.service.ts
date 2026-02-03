@@ -883,7 +883,7 @@ function getCustomBoxHTML(cfg) {
 // ===== RENDER CHAT BLOCK (for Advanced Chat Builder) =====
 function renderChatBlock(block: any, cfg: any, depth: number = 0): string {
   const baseStyles = Object.entries(block.style || {})
-    .map(([k, v]) => `${ k.replace(/[A-Z]/g, m => '-' + m.toLowerCase()) }: ${ v } `)
+    .map(([k, v]) => \`\${k.replace(/[A-Z]/g, m => '-' + m.toLowerCase())}: \${v}\`)
     .join('; ');
 
   const mobileHidden = block.mobileHidden ? ' class="chat-mobile-hidden"' : '';
@@ -898,115 +898,115 @@ function renderChatBlock(block: any, cfg: any, depth: number = 0): string {
     case 'header':
       // Header with Avatar, Title, Subtitle, Close Button
       // Fallbacks
-      const headerBg = (block.style && block.style.background) ? '' : `background: ${ cfg.headerBackgroundColor || '#ffffff' }; color: ${ cfg.headerTextColor || '#000000' }; `;
-      const headerBorder = (block.style && block.style.borderBottom) ? '' : `border - bottom: 1px solid rgba(0, 0, 0, 0.05); `;
-      const headerStyle = `padding: 20px 24px; display: flex; align - items: center; justify - content: space - between; ${ headerBorder } ${ headerBg } ${ baseStyles } `;
+      const headerBg = (block.style && block.style.background) ? '' : \`background: \${cfg.headerBackgroundColor || '#ffffff'}; color: \${cfg.headerTextColor || '#000000'};\`;
+      const headerBorder = (block.style && block.style.borderBottom) ? '' : \`border-bottom: 1px solid rgba(0,0,0,0.05);\`;
+      const headerStyle = \`padding: 20px 24px; display: flex; align-items: center; justify-content: space-between; \${headerBorder} \${headerBg} \${baseStyles}\`;
       
       // Avatar
       let avatarHtml = '';
       if (cfg.showAgentAvatar !== false) {
           let avImg = '';
           if (cfg.headerAvatarUrl) {
-              avImg = `< img src = "${cfg.headerAvatarUrl}" alt = "Avatar" style = "width: 100%; height: 100%; object-fit: cover;" > `;
+              avImg = \`<img src="\${cfg.headerAvatarUrl}" alt="Avatar" style="width: 100%; height: 100%; object-fit: cover;">\`;
           } else if (cfg.headerAvatarEmoji) {
-              avImg = `< div style = "font-size: 24px;" > ${ cfg.headerAvatarEmoji } </div>`;
-} else {
-  avImg = `<div style="width: 100%; height: 100%; background: linear-gradient(135deg, #e0c3fc 0%, #8ec5fc 100%);"></div>`;
-}
-avatarHtml = `<div style="width: 48px; height: 48px; border-radius: 16px; margin-right: 16px; overflow: hidden; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 12px rgba(0,0,0,0.05); background: ${cfg.avatarBackgroundColor || 'transparent'}; flex-shrink: 0;">${avImg}</div>`;
+              avImg = \`<div style="font-size: 24px;">\${cfg.headerAvatarEmoji}</div>\`;
+          } else {
+              avImg = \`<div style="width: 100%; height: 100%; background: linear-gradient(135deg, #e0c3fc 0%, #8ec5fc 100%);"></div>\`;
+          }
+          avatarHtml = \`<div style="width: 48px; height: 48px; border-radius: 16px; margin-right: 16px; overflow: hidden; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 12px rgba(0,0,0,0.05); background: \${cfg.avatarBackgroundColor || 'transparent'}; flex-shrink: 0;">\${avImg}</div>\`;
       }
+      
+      // Texts & Online Status
+      let textsHtml = '<div>';
+      textsHtml += \`<div style="font-weight: 700; font-size: 18px; letter-spacing: -0.02em;">\${cfg.headerTitle || 'Chat'}</div>\`;
+      if (cfg.headerSubtitle) {
+          textsHtml += \`<div style="font-size: 13px; opacity: 0.6; margin-top: 2px;">\${cfg.headerSubtitle}</div>\`;
+      }
+      if (cfg.showOnlineStatus) {
+          textsHtml += \`<div style="display: flex; align-items: center; gap: 6px; font-size: 12px; opacity: 0.8; margin-top: 4px;"><span style="width: 8px; height: 8px; background: \${cfg.onlineStatusColor || '#10b981'}; border-radius: 50%; display: inline-block; border: 1.5px solid #fff;"></span> Online</div>\`;
+      }
+      textsHtml += '</div>';
 
-// Texts & Online Status
-let textsHtml = '<div>';
-textsHtml += `<div style="font-weight: 700; font-size: 18px; letter-spacing: -0.02em;">${cfg.headerTitle || 'Chat'}</div>`;
-if (cfg.headerSubtitle) {
-  textsHtml += `<div style="font-size: 13px; opacity: 0.6; margin-top: 2px;">${cfg.headerSubtitle}</div>`;
-}
-if (cfg.showOnlineStatus) {
-  textsHtml += `<div style="display: flex; align-items: center; gap: 6px; font-size: 12px; opacity: 0.8; margin-top: 4px;"><span style="width: 8px; height: 8px; background: ${cfg.onlineStatusColor || '#10b981'}; border-radius: 50%; display: inline-block; border: 1.5px solid #fff;"></span> Online</div>`;
-}
-textsHtml += '</div>';
-
-const leftHtml = `<div style="display: flex; align-items: center;">${avatarHtml}${textsHtml}</div>`;
-
-const closeBtn = `<button onclick="window.parent.postMessage({type: 'bonsai-widget-close'}, '*')" style="background: transparent; border: none; color: inherit; font-size: 20px; cursor: pointer; padding: 0; width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; transition: opacity 0.2s;">âœ•</button>`;
-
-content = `<div id="${blockId}"${mobileHidden} style="${headerStyle}">${leftHtml}${closeBtn}</div>`;
-break;
+      const leftHtml = \`<div style="display: flex; align-items: center;">\${avatarHtml}\${textsHtml}</div>\`;
+      
+      const closeBtn = \`<button onclick="window.parent.postMessage({type: 'bonsai-widget-close'}, '*')" style="background: transparent; border: none; color: inherit; font-size: 20px; cursor: pointer; padding: 0; width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; transition: opacity 0.2s;">×</button>\`;
+      
+      content = \`<div id="\${blockId}"\${mobileHidden} style="\${headerStyle}">\${leftHtml}\${closeBtn}</div>\`;
+      break;
 
     case 'messages':
-// Messages Area
-const msgBg = (block.style && block.style.background) ? '' : `background: ${cfg.chatBackgroundColor || '#ffffff'};`;
-const msgStyle = `flex: 1; overflow-y: auto; padding: 24px; display: flex; flex-direction: column; gap: 24px; ${msgBg} ${baseStyles}`;
-content = `<div id="ai-chat-messages"${mobileHidden} style="${msgStyle}">${childrenHtml}</div>`;
-break;
+      // Messages Area
+      const msgBg = (block.style && block.style.background) ? '' : \`background: \${cfg.chatBackgroundColor || '#ffffff'};\`;
+      const msgStyle = \`flex: 1; overflow-y: auto; padding: 24px; display: flex; flex-direction: column; gap: 24px; \${msgBg} \${baseStyles}\`;
+      content = \`<div id="ai-chat-messages"\${mobileHidden} style="\${msgStyle}">\${childrenHtml}</div>\`;
+      break;
 
     case 'input':
-// Input Area
-const inputAreaBg = (block.style && block.style.background) ? '' : `background: ${cfg.inputAreaBackgroundColor || '#ffffff'};`;
-const inputAreaTop = (block.style && block.style.borderTop) ? '' : `border-top: 1px solid ${cfg.inputAreaBorderColor || 'transparent'};`;
-const inputAreaStyle = `padding: 20px 24px; ${inputAreaTop} ${inputAreaBg} ${baseStyles}`;
+      // Input Area
+      const inputAreaBg = (block.style && block.style.background) ? '' : \`background: \${cfg.inputAreaBackgroundColor || '#ffffff'};\`;
+      const inputAreaTop = (block.style && block.style.borderTop) ? '' : \`border-top: 1px solid \${cfg.inputAreaBorderColor || 'transparent'};\`;
+      const inputAreaStyle = \`padding: 20px 24px; \${inputAreaTop} \${inputAreaBg} \${baseStyles}\`;
+      
+      const inputBg = cfg.inputBackgroundColor || '#f3f4f6';
+      const inputBorder = cfg.inputBorderColor || 'transparent';
+      const inputInnerStyle = \`display: flex; gap: 12px; align-items: center; background: \${inputBg}; border-radius: 32px; padding: 6px 6px 6px 20px; border: 1px solid \${inputBorder};\`;
+      
+      const placeholder = block.placeholder || cfg.placeholder || "Type a message...";
+      
+      const sendBtnBg = cfg.sendButtonBackgroundColor || cfg.primaryColor || '#000000';
+      const sendBtnColor = cfg.sendButtonIconColor || '#ffffff';
+      
+      const sendIcon = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M1.94619 9.31543C1.42365 9.14125 1.41953 8.86022 1.95694 8.68108L21.0431 2.31901C21.5716 2.14285 21.8747 2.43866 21.7266 2.95694L16.2734 22.0432C16.1224 22.5716 15.8178 22.59 15.5945 22.0876L12 14L18 6.00005L10 12L1.94619 9.31543Z"></path></svg>';
 
-const inputBg = cfg.inputBackgroundColor || '#f3f4f6';
-const inputBorder = cfg.inputBorderColor || 'transparent';
-const inputInnerStyle = `display: flex; gap: 12px; align-items: center; background: ${inputBg}; border-radius: 32px; padding: 6px 6px 6px 20px; border: 1px solid ${inputBorder};`;
-
-const placeholder = block.placeholder || cfg.placeholder || "Type a message...";
-
-const sendBtnBg = cfg.sendButtonBackgroundColor || cfg.primaryColor || '#000000';
-const sendBtnColor = cfg.sendButtonIconColor || '#ffffff';
-
-const sendIcon = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M1.94619 9.31543C1.42365 9.14125 1.41953 8.86022 1.95694 8.68108L21.0431 2.31901C21.5716 2.14285 21.8747 2.43866 21.7266 2.95694L16.2734 22.0432C16.1224 22.5716 15.8178 22.59 15.5945 22.0876L12 14L18 6.00005L10 12L1.94619 9.31543Z"></path></svg>';
-
-content = `
-        <div id="${blockId}"${mobileHidden} style="${inputAreaStyle}">
-          <div style="${inputInnerStyle}">
-            <input type="text" id="ai-chat-input" placeholder="${placeholder}" style="flex: 1; border: none; font-size: 15px; outline: none; background: transparent; padding: 10px 0; color: ${cfg.inputTextColor || '#1f2937'};">
-            <button id="ai-chat-send" style="background: ${sendBtnBg}; color: ${sendBtnColor}; border: none; padding: 0; width: 42px; height: 42px; border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0; transition: transform 0.1s;">
-              ${sendIcon}
+      content = \`
+        <div id="\${blockId}"\${mobileHidden} style="\${inputAreaStyle}">
+          <div style="\${inputInnerStyle}">
+            <input type="text" id="ai-chat-input" placeholder="\${placeholder}" style="flex: 1; border: none; font-size: 15px; outline: none; background: transparent; padding: 10px 0; color: \${cfg.inputTextColor || '#1f2937'};">
+            <button id="ai-chat-send" style="background: \${sendBtnBg}; color: \${sendBtnColor}; border: none; padding: 0; width: 42px; height: 42px; border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0; transition: transform 0.1s;">
+              \${sendIcon}
             </button>
-            ${childrenHtml}
+            \${childrenHtml}
           </div>
-        </div>`;
-break;
+        </div>\`;
+      break;
 
     case 'container':
-content = `<div id="${blockId}"${mobileHidden} style="${baseStyles}">${childrenHtml}</div>`;
-break;
+      content = \`<div id="\${blockId}"\${mobileHidden} style="\${baseStyles}">\${childrenHtml}</div>\`;
+      break;
       
     case 'text':
-const textStyle = `padding: 8px 16px; ${baseStyles}`;
-content = `<div id="${blockId}"${mobileHidden} style="${textStyle}">${block.content || ''}${childrenHtml}</div>`;
-break;
+      const textStyle = \`padding: 8px 16px; \${baseStyles}\`;
+      content = \`<div id="\${blockId}"\${mobileHidden} style="\${textStyle}">\${block.content || ''}\${childrenHtml}</div>\`;
+      break;
 
     case 'button':
-const btnStyle = `padding: 8px 16px; border: none; cursor: pointer; border-radius: 8px; ${baseStyles}`;
-let onClick = '';
-if (block.onClick === 'close-chat') {
-  onClick = ' onclick="window.parent.postMessage({type: \'bonsai-widget-close\'}, \'*\')"';
-} else if (block.onClick === 'open-url' && block.url) {
-  onClick = ' onclick="window.open(\'' + block.url + '\', \'_blank\')"';
-}
-content = `<button id="${blockId}"${mobileHidden}${onClick} style="${btnStyle}">${block.content || 'Button'}</button>`;
-break;
+      const btnStyle = \`padding: 8px 16px; border: none; cursor: pointer; border-radius: 8px; \${baseStyles}\`;
+      let onClick = '';
+      if (block.onClick === 'close-chat') {
+        onClick = ' onclick="window.parent.postMessage({type: \\'bonsai-widget-close\\'}, \\'*\\')"';
+      } else if (block.onClick === 'open-url' && block.url) {
+        onClick = ' onclick="window.open(\\'' + block.url + '\\', \\'_blank\\')"';
+      }
+      content = \`<button id="\${blockId}"\${mobileHidden}\${onClick} style="\${btnStyle}">\${block.content || 'Button'}</button>\`;
+      break;
       
     case 'divider':
-const divStyle = `height: 1px; background: rgba(0,0,0,0.1); ${baseStyles}`;
-content = `<div id="${blockId}" style="${divStyle}"></div>`;
-break;
+      const divStyle = \`height: 1px; background: rgba(0,0,0,0.1); \${baseStyles}\`;
+      content = \`<div id="\${blockId}" style="\${divStyle}"></div>\`;
+      break;
       
     case 'branding':
-if (cfg.showBranding) {
-  const brandingBg = (block.style && block.style.background) ? '' : `background: ${cfg.chatBackgroundColor || '#fff'};`;
-  content = `<div id="${blockId}" style="padding: 8px; text-align: center; font-size: 11px; color: #d1d5db; ${brandingBg} ${baseStyles}"><a href="${cfg.brandingUrl || 'https://bonsaimedia.nl'}" target="_blank" style="color: inherit; text-decoration: none;">${cfg.brandingText || 'Powered by Bonsai'}</a></div>`;
-}
-break;
+      if (cfg.showBranding) {
+          const brandingBg = (block.style && block.style.background) ? '' : \`background: \${cfg.chatBackgroundColor || '#fff'};\`;
+          content = \`<div id="\${blockId}" style="padding: 8px; text-align: center; font-size: 11px; color: #d1d5db; \${brandingBg} \${baseStyles}"><a href="\${cfg.brandingUrl || 'https://bonsaimedia.nl'}" target="_blank" style="color: inherit; text-decoration: none;">\${cfg.brandingText || 'Powered by Bonsai'}</a></div>\`;
+      }
+      break;
 
     default:
-content = `<div id="${blockId}"${mobileHidden} style="${baseStyles}">${childrenHtml}</div>`;
+      content = \`<div id="\${blockId}"\${mobileHidden} style="\${baseStyles}">\${childrenHtml}</div>\`;
   }
 
-return content;
+  return content;
 }
 function getChatWindowHTML(cfg, apiUrl) {
   // === ADVANCED CHAT MODE: Render chatStructure ===
@@ -1152,68 +1152,68 @@ function getChatWindowStyles(cfg) {
     if (cfg.theme === 'dark') background = 'rgba(30, 30, 30, 0.85)';
 
     glassEffectCss = \`backdrop-filter: blur(\${blur}px); -webkit-backdrop-filter: blur(\${blur}px); border: 1px solid rgba(255,255,255,0.4);\`;
-    }
-  
-    let sizeStyles = '';
-    let positionStyles = '';
-  
-    // Determine size based on layout mode
-    switch (layoutMode) {
-      case 'full-height':
-        sizeStyles = 'width: ' + (cfg.chatWidth || 380) + 'px; height: calc(100vh - 40px); ';
-        positionStyles = 'position: fixed; bottom: 20px; right: ' + (20 - chatOffsetX) + 'px; ';
-        break;
-  
-      case 'full-width':
-        sizeStyles = 'width: 100vw; height: ' + (cfg.chatHeight || 650) + 'px; ';
-        positionStyles = 'position: fixed; bottom: ' + (-chatOffsetY) + 'px; left: 0; ';
-        break;
-  
-      case 'percentage':
-        const widthPct = cfg.widthPercentage || 80;
-        const heightPct = cfg.heightPercentage || 80;
-        sizeStyles = 'width: ' + widthPct + 'vw; height: ' + heightPct + 'vh; ';
-  
-        positionStyles = 'position: fixed; bottom: ' + (20 - chatOffsetY) + 'px; right: ' + (20 - chatOffsetX) + 'px; ';
-        break;
-  
-      case 'fixed':
-      default:
-        sizeStyles = 'width: ' + (cfg.chatWidth || 380) + 'px; height: ' + (cfg.chatHeight || 650) + 'px; ';
-        positionStyles = 'position: absolute; bottom: ' + (100 - chatOffsetY) + 'px; right: ' + (-chatOffsetX) + 'px; ';
-        break;
-    }
-  
-    return sizeStyles + positionStyles +
-      'background: ' + background + '; ' +
-      'border-radius: ' + (cfg.chatBorderRadius || 24) + 'px; ' +
-      'box-shadow: ' + (cfg.shadowIntensity === 'none' ? 'none' : '0 24px 60px -12px rgba(0,0,0,0.14), 0 12px 24px -4px rgba(0,0,0,0.06)') + '; ' +
-      'border: ' + (cfg.glassEffect ? '1px solid rgba(255,255,255,0.4)' : '1px solid rgba(0,0,0,0.06)') + '; ' +
-      'display: flex; flex-direction: column; ' +
-      'overflow: hidden; ' +
-      'font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; ' +
-      'transform-origin: bottom right; ' +
-      glassEffectCss;
   }
 
-  function getAnimation(type) {
-    if (!type || type === 'none') return 'none';
-    
-    // Normalize type
-    if (type === 'slide') type = 'slide-up';
-    
-    let name = 'aiAnim-' + type;
-    let keyframes = '';
-    
-    // If style already exists, just return the animation name (assuming we use standard names)
-    // We'll use specific names for keyframes
-    let keyframeName = 'aiKeyframe' + type;
+  let sizeStyles = '';
+  let positionStyles = '';
 
-    if (document.getElementById('ai-style-' + type)) return keyframeName;
+  // Determine size based on layout mode
+  switch (layoutMode) {
+    case 'full-height':
+      sizeStyles = 'width: ' + (cfg.chatWidth || 380) + 'px; height: calc(100vh - 40px); ';
+      positionStyles = 'position: fixed; bottom: 20px; right: ' + (20 - chatOffsetX) + 'px; ';
+      break;
 
-    switch (type) {
-      case 'bounce':
-        keyframes = \`@keyframes \${keyframeName} { 
+    case 'full-width':
+      sizeStyles = 'width: 100vw; height: ' + (cfg.chatHeight || 650) + 'px; ';
+      positionStyles = 'position: fixed; bottom: ' + (-chatOffsetY) + 'px; left: 0; ';
+      break;
+
+    case 'percentage':
+      const widthPct = cfg.widthPercentage || 80;
+      const heightPct = cfg.heightPercentage || 80;
+      sizeStyles = 'width: ' + widthPct + 'vw; height: ' + heightPct + 'vh; ';
+
+      positionStyles = 'position: fixed; bottom: ' + (20 - chatOffsetY) + 'px; right: ' + (20 - chatOffsetX) + 'px; ';
+      break;
+
+    case 'fixed':
+    default:
+      sizeStyles = 'width: ' + (cfg.chatWidth || 380) + 'px; height: ' + (cfg.chatHeight || 650) + 'px; ';
+      positionStyles = 'position: absolute; bottom: ' + (100 - chatOffsetY) + 'px; right: ' + (-chatOffsetX) + 'px; ';
+      break;
+  }
+
+  return sizeStyles + positionStyles +
+    'background: ' + background + '; ' +
+    'border-radius: ' + (cfg.chatBorderRadius || 24) + 'px; ' +
+    'box-shadow: ' + (cfg.shadowIntensity === 'none' ? 'none' : '0 24px 60px -12px rgba(0,0,0,0.14), 0 12px 24px -4px rgba(0,0,0,0.06)') + '; ' +
+    'border: ' + (cfg.glassEffect ? '1px solid rgba(255,255,255,0.4)' : '1px solid rgba(0,0,0,0.06)') + '; ' +
+    'display: flex; flex-direction: column; ' +
+    'overflow: hidden; ' +
+    'font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; ' +
+    'transform-origin: bottom right; ' +
+    glassEffectCss;
+}
+
+function getAnimation(type) {
+  if (!type || type === 'none') return 'none';
+
+  // Normalize type
+  if (type === 'slide') type = 'slide-up';
+
+  let name = 'aiAnim-' + type;
+  let keyframes = '';
+
+  // If style already exists, just return the animation name (assuming we use standard names)
+  // We'll use specific names for keyframes
+  let keyframeName = 'aiKeyframe' + type;
+
+  if (document.getElementById('ai-style-' + type)) return keyframeName;
+
+  switch (type) {
+    case 'bounce':
+      keyframes = \`@keyframes \${keyframeName} { 
           0%, 20%, 50%, 80%, 100% { transform: translateY(0); } 
           40% { transform: translateY(-10px); } 
           60% { transform: translateY(-5px); } 
@@ -1758,4 +1758,4 @@ script.src = 'https://cdn.socket.io/4.6.1/socket.io.min.js';
 document.head.appendChild(script);
 }) ();
 `;
-  }
+}
