@@ -883,7 +883,7 @@ function getCustomBoxHTML(cfg) {
 // ===== RENDER CHAT BLOCK (for Advanced Chat Builder) =====
 function renderChatBlock(block: any, cfg: any, depth: number = 0): string {
   const baseStyles = Object.entries(block.style || {})
-    .map(([k, v]) => `${k.replace(/[A-Z]/g, m => '-' + m.toLowerCase())}: ${v}`)
+    .map(([k, v]) => `${ k.replace(/[A-Z]/g, m => '-' + m.toLowerCase()) }: ${ v } `)
     .join('; ');
 
   const mobileHidden = block.mobileHidden ? ' class="chat-mobile-hidden"' : '';
@@ -898,67 +898,67 @@ function renderChatBlock(block: any, cfg: any, depth: number = 0): string {
     case 'header':
       // Header with Avatar, Title, Subtitle, Close Button
       // Fallbacks
-      const headerBg = (block.style && block.style.background) ? '' : `background: ${cfg.headerBackgroundColor || '#ffffff'}; color: ${cfg.headerTextColor || '#000000'};`;
-      const headerBorder = (block.style && block.style.borderBottom) ? '' : `border-bottom: 1px solid rgba(0,0,0,0.05);`;
-      const headerStyle = `padding: 20px 24px; display: flex; align-items: center; justify-content: space-between; ${headerBorder} ${headerBg} ${baseStyles}`;
+      const headerBg = (block.style && block.style.background) ? '' : `background: ${ cfg.headerBackgroundColor || '#ffffff' }; color: ${ cfg.headerTextColor || '#000000' }; `;
+      const headerBorder = (block.style && block.style.borderBottom) ? '' : `border - bottom: 1px solid rgba(0, 0, 0, 0.05); `;
+      const headerStyle = `padding: 20px 24px; display: flex; align - items: center; justify - content: space - between; ${ headerBorder } ${ headerBg } ${ baseStyles } `;
       
       // Avatar
       let avatarHtml = '';
       if (cfg.showAgentAvatar !== false) {
           let avImg = '';
           if (cfg.headerAvatarUrl) {
-              avImg = `<img src="${cfg.headerAvatarUrl}" alt="Avatar" style="width: 100%; height: 100%; object-fit: cover;">`;
+              avImg = `< img src = "${cfg.headerAvatarUrl}" alt = "Avatar" style = "width: 100%; height: 100%; object-fit: cover;" > `;
           } else if (cfg.headerAvatarEmoji) {
-              avImg = `<div style="font-size: 24px;">${cfg.headerAvatarEmoji}</div>`;
-          } else {
-              avImg = `<div style="width: 100%; height: 100%; background: linear-gradient(135deg, #e0c3fc 0%, #8ec5fc 100%);"></div>`;
-          }
-          avatarHtml = `<div style="width: 48px; height: 48px; border-radius: 16px; margin-right: 16px; overflow: hidden; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 12px rgba(0,0,0,0.05); background: ${cfg.avatarBackgroundColor || 'transparent'}; flex-shrink: 0;">${avImg}</div>`;
+              avImg = `< div style = "font-size: 24px;" > ${ cfg.headerAvatarEmoji } </div>`;
+} else {
+  avImg = `<div style="width: 100%; height: 100%; background: linear-gradient(135deg, #e0c3fc 0%, #8ec5fc 100%);"></div>`;
+}
+avatarHtml = `<div style="width: 48px; height: 48px; border-radius: 16px; margin-right: 16px; overflow: hidden; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 12px rgba(0,0,0,0.05); background: ${cfg.avatarBackgroundColor || 'transparent'}; flex-shrink: 0;">${avImg}</div>`;
       }
-      
-      // Texts & Online Status
-      let textsHtml = '<div>';
-      textsHtml += `<div style="font-weight: 700; font-size: 18px; letter-spacing: -0.02em;">${cfg.headerTitle || 'Chat'}</div>`;
-      if (cfg.headerSubtitle) {
-          textsHtml += `<div style="font-size: 13px; opacity: 0.6; margin-top: 2px;">${cfg.headerSubtitle}</div>`;
-      }
-      if (cfg.showOnlineStatus) {
-          textsHtml += `<div style="display: flex; align-items: center; gap: 6px; font-size: 12px; opacity: 0.8; margin-top: 4px;"><span style="width: 8px; height: 8px; background: ${cfg.onlineStatusColor || '#10b981'}; border-radius: 50%; display: inline-block; border: 1.5px solid #fff;"></span> Online</div>`;
-      }
-      textsHtml += '</div>';
 
-      const leftHtml = `<div style="display: flex; align-items: center;">${avatarHtml}${textsHtml}</div>`;
-      
-      const closeBtn = `<button onclick="window.parent.postMessage({type: 'bonsai-widget-close'}, '*')" style="background: transparent; border: none; color: inherit; font-size: 20px; cursor: pointer; padding: 0; width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; transition: opacity 0.2s;">âœ•</button>`;
-      
-      content = `<div id="${blockId}"${mobileHidden} style="${headerStyle}">${leftHtml}${closeBtn}</div>`;
-      break;
+// Texts & Online Status
+let textsHtml = '<div>';
+textsHtml += `<div style="font-weight: 700; font-size: 18px; letter-spacing: -0.02em;">${cfg.headerTitle || 'Chat'}</div>`;
+if (cfg.headerSubtitle) {
+  textsHtml += `<div style="font-size: 13px; opacity: 0.6; margin-top: 2px;">${cfg.headerSubtitle}</div>`;
+}
+if (cfg.showOnlineStatus) {
+  textsHtml += `<div style="display: flex; align-items: center; gap: 6px; font-size: 12px; opacity: 0.8; margin-top: 4px;"><span style="width: 8px; height: 8px; background: ${cfg.onlineStatusColor || '#10b981'}; border-radius: 50%; display: inline-block; border: 1.5px solid #fff;"></span> Online</div>`;
+}
+textsHtml += '</div>';
+
+const leftHtml = `<div style="display: flex; align-items: center;">${avatarHtml}${textsHtml}</div>`;
+
+const closeBtn = `<button onclick="window.parent.postMessage({type: 'bonsai-widget-close'}, '*')" style="background: transparent; border: none; color: inherit; font-size: 20px; cursor: pointer; padding: 0; width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; transition: opacity 0.2s;">âœ•</button>`;
+
+content = `<div id="${blockId}"${mobileHidden} style="${headerStyle}">${leftHtml}${closeBtn}</div>`;
+break;
 
     case 'messages':
-      // Messages Area
-      const msgBg = (block.style && block.style.background) ? '' : `background: ${cfg.chatBackgroundColor || '#ffffff'};`;
-      const msgStyle = `flex: 1; overflow-y: auto; padding: 24px; display: flex; flex-direction: column; gap: 24px; ${msgBg} ${baseStyles}`;
-      content = `<div id="ai-chat-messages"${mobileHidden} style="${msgStyle}">${childrenHtml}</div>`;
-      break;
+// Messages Area
+const msgBg = (block.style && block.style.background) ? '' : `background: ${cfg.chatBackgroundColor || '#ffffff'};`;
+const msgStyle = `flex: 1; overflow-y: auto; padding: 24px; display: flex; flex-direction: column; gap: 24px; ${msgBg} ${baseStyles}`;
+content = `<div id="ai-chat-messages"${mobileHidden} style="${msgStyle}">${childrenHtml}</div>`;
+break;
 
     case 'input':
-      // Input Area
-      const inputAreaBg = (block.style && block.style.background) ? '' : `background: ${cfg.inputAreaBackgroundColor || '#ffffff'};`;
-      const inputAreaTop = (block.style && block.style.borderTop) ? '' : `border-top: 1px solid ${cfg.inputAreaBorderColor || 'transparent'};`;
-      const inputAreaStyle = `padding: 20px 24px; ${inputAreaTop} ${inputAreaBg} ${baseStyles}`;
-      
-      const inputBg = cfg.inputBackgroundColor || '#f3f4f6';
-      const inputBorder = cfg.inputBorderColor || 'transparent';
-      const inputInnerStyle = `display: flex; gap: 12px; align-items: center; background: ${inputBg}; border-radius: 32px; padding: 6px 6px 6px 20px; border: 1px solid ${inputBorder};`;
-      
-      const placeholder = block.placeholder || cfg.placeholder || "Type a message...";
-      
-      const sendBtnBg = cfg.sendButtonBackgroundColor || cfg.primaryColor || '#000000';
-      const sendBtnColor = cfg.sendButtonIconColor || '#ffffff';
-      
-      const sendIcon = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M1.94619 9.31543C1.42365 9.14125 1.41953 8.86022 1.95694 8.68108L21.0431 2.31901C21.5716 2.14285 21.8747 2.43866 21.7266 2.95694L16.2734 22.0432C16.1224 22.5716 15.8178 22.59 15.5945 22.0876L12 14L18 6.00005L10 12L1.94619 9.31543Z"></path></svg>';
+// Input Area
+const inputAreaBg = (block.style && block.style.background) ? '' : `background: ${cfg.inputAreaBackgroundColor || '#ffffff'};`;
+const inputAreaTop = (block.style && block.style.borderTop) ? '' : `border-top: 1px solid ${cfg.inputAreaBorderColor || 'transparent'};`;
+const inputAreaStyle = `padding: 20px 24px; ${inputAreaTop} ${inputAreaBg} ${baseStyles}`;
 
-      content = `
+const inputBg = cfg.inputBackgroundColor || '#f3f4f6';
+const inputBorder = cfg.inputBorderColor || 'transparent';
+const inputInnerStyle = `display: flex; gap: 12px; align-items: center; background: ${inputBg}; border-radius: 32px; padding: 6px 6px 6px 20px; border: 1px solid ${inputBorder};`;
+
+const placeholder = block.placeholder || cfg.placeholder || "Type a message...";
+
+const sendBtnBg = cfg.sendButtonBackgroundColor || cfg.primaryColor || '#000000';
+const sendBtnColor = cfg.sendButtonIconColor || '#ffffff';
+
+const sendIcon = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M1.94619 9.31543C1.42365 9.14125 1.41953 8.86022 1.95694 8.68108L21.0431 2.31901C21.5716 2.14285 21.8747 2.43866 21.7266 2.95694L16.2734 22.0432C16.1224 22.5716 15.8178 22.59 15.5945 22.0876L12 14L18 6.00005L10 12L1.94619 9.31543Z"></path></svg>';
+
+content = `
         <div id="${blockId}"${mobileHidden} style="${inputAreaStyle}">
           <div style="${inputInnerStyle}">
             <input type="text" id="ai-chat-input" placeholder="${placeholder}" style="flex: 1; border: none; font-size: 15px; outline: none; background: transparent; padding: 10px 0; color: ${cfg.inputTextColor || '#1f2937'};">
@@ -968,45 +968,45 @@ function renderChatBlock(block: any, cfg: any, depth: number = 0): string {
             ${childrenHtml}
           </div>
         </div>`;
-      break;
+break;
 
     case 'container':
-      content = `<div id="${blockId}"${mobileHidden} style="${baseStyles}">${childrenHtml}</div>`;
-      break;
+content = `<div id="${blockId}"${mobileHidden} style="${baseStyles}">${childrenHtml}</div>`;
+break;
       
     case 'text':
-      const textStyle = `padding: 8px 16px; ${baseStyles}`;
-      content = `<div id="${blockId}"${mobileHidden} style="${textStyle}">${block.content || ''}${childrenHtml}</div>`;
-      break;
+const textStyle = `padding: 8px 16px; ${baseStyles}`;
+content = `<div id="${blockId}"${mobileHidden} style="${textStyle}">${block.content || ''}${childrenHtml}</div>`;
+break;
 
     case 'button':
-      const btnStyle = `padding: 8px 16px; border: none; cursor: pointer; border-radius: 8px; ${baseStyles}`;
-      let onClick = '';
-      if (block.onClick === 'close-chat') {
-        onClick = ' onclick="window.parent.postMessage({type: \'bonsai-widget-close\'}, \'*\')"';
-      } else if (block.onClick === 'open-url' && block.url) {
-        onClick = ' onclick="window.open(\'' + block.url + '\', \'_blank\')"';
-      }
-      content = `<button id="${blockId}"${mobileHidden}${onClick} style="${btnStyle}">${block.content || 'Button'}</button>`;
-      break;
+const btnStyle = `padding: 8px 16px; border: none; cursor: pointer; border-radius: 8px; ${baseStyles}`;
+let onClick = '';
+if (block.onClick === 'close-chat') {
+  onClick = ' onclick="window.parent.postMessage({type: \'bonsai-widget-close\'}, \'*\')"';
+} else if (block.onClick === 'open-url' && block.url) {
+  onClick = ' onclick="window.open(\'' + block.url + '\', \'_blank\')"';
+}
+content = `<button id="${blockId}"${mobileHidden}${onClick} style="${btnStyle}">${block.content || 'Button'}</button>`;
+break;
       
     case 'divider':
-      const divStyle = `height: 1px; background: rgba(0,0,0,0.1); ${baseStyles}`;
-      content = `<div id="${blockId}" style="${divStyle}"></div>`;
-      break;
+const divStyle = `height: 1px; background: rgba(0,0,0,0.1); ${baseStyles}`;
+content = `<div id="${blockId}" style="${divStyle}"></div>`;
+break;
       
     case 'branding':
-      if (cfg.showBranding) {
-          const brandingBg = (block.style && block.style.background) ? '' : `background: ${cfg.chatBackgroundColor || '#fff'};`;
-          content = `<div id="${blockId}" style="padding: 8px; text-align: center; font-size: 11px; color: #d1d5db; ${brandingBg} ${baseStyles}"><a href="${cfg.brandingUrl || 'https://bonsaimedia.nl'}" target="_blank" style="color: inherit; text-decoration: none;">${cfg.brandingText || 'Powered by Bonsai'}</a></div>`;
-      }
-      break;
+if (cfg.showBranding) {
+  const brandingBg = (block.style && block.style.background) ? '' : `background: ${cfg.chatBackgroundColor || '#fff'};`;
+  content = `<div id="${blockId}" style="padding: 8px; text-align: center; font-size: 11px; color: #d1d5db; ${brandingBg} ${baseStyles}"><a href="${cfg.brandingUrl || 'https://bonsaimedia.nl'}" target="_blank" style="color: inherit; text-decoration: none;">${cfg.brandingText || 'Powered by Bonsai'}</a></div>`;
+}
+break;
 
     default:
-      content = `<div id="${blockId}"${mobileHidden} style="${baseStyles}">${childrenHtml}</div>`;
+content = `<div id="${blockId}"${mobileHidden} style="${baseStyles}">${childrenHtml}</div>`;
   }
 
-  return content;
+return content;
 }
 function getChatWindowHTML(cfg, apiUrl) {
   // === ADVANCED CHAT MODE: Render chatStructure ===
@@ -1108,30 +1108,31 @@ function getChatWindowHTML(cfg, apiUrl) {
   }
 
   // HTML Construction
-  return '<div style=\"background: ' + headerBgColor + '; color: ' + cfg.headerTextColor + '; padding: 20px 24px; display: flex; align-items: center; justify-content: space-between;\">' +
-    '<div style=\"display: flex; align-items: center; gap: 16px;\">' +
-    (cfg.showAgentAvatar !== false ? '<div style=\"width: 48px; height: 48px; border-radius: 16px; background: ' + avatarBg + '; display: flex; align-items: center; justify-content: center; overflow: hidden; box-shadow: 0 4px 12px rgba(0,0,0,0.05);\">' + avatarContent + '</div>' : '') +
+  // HTML Construction
+  return '<div style="background: ' + headerBgColor + '; color: ' + cfg.headerTextColor + '; padding: 20px 24px; display: flex; align-items: center; justify-content: space-between;">' +
+    '<div style="display: flex; align-items: center; gap: 16px;">' +
+    (cfg.showAgentAvatar !== false ? '<div style="width: 48px; height: 48px; border-radius: 16px; background: ' + avatarBg + '; display: flex; align-items: center; justify-content: center; overflow: hidden; box-shadow: 0 4px 12px rgba(0,0,0,0.05);">' + avatarContent + '</div>' : '') +
     '<div>' +
-    (cfg.headerTitle ? '<div style=\"font-weight: 700; font-size: 18px; letter-spacing: -0.02em;\">' + cfg.headerTitle + '</div>' : '') +
-    (cfg.headerSubtitle ? '<div style=\"font-size: 13px; opacity: 0.6; margin-top: 2px;\">' + cfg.headerSubtitle + '</div>' : '') +
-    (cfg.showOnlineStatus ? '<div style=\"display: flex; align-items: center; gap: 6px; font-size: 12px; opacity: 0.8; margin-top: 4px;\"><span style=\"width: 8px; height: 8px; background: ' + onlineColor + '; border-radius: 50%; display: inline-block; border: 1.5px solid #fff;\"></span> Online</div>' : '') +
+    (cfg.headerTitle ? '<div style="font-weight: 700; font-size: 18px; letter-spacing: -0.02em;">' + cfg.headerTitle + '</div>' : '') +
+    (cfg.headerSubtitle ? '<div style="font-size: 13px; opacity: 0.6; margin-top: 2px;">' + cfg.headerSubtitle + '</div>' : '') +
+    (cfg.showOnlineStatus ? '<div style="display: flex; align-items: center; gap: 6px; font-size: 12px; opacity: 0.8; margin-top: 4px;"><span style="width: 8px; height: 8px; background: ' + onlineColor + '; border-radius: 50%; display: inline-block; border: 1.5px solid #fff;"></span> Online</div>' : '') +
     '</div>' +
     '</div>' +
-    '<button id=\"ai-chat-close\" style=\"background: ' + closeIconBg + '; border: none; color: ' + closeIconColor + '; font-size: 20px; cursor: pointer; padding: 0; width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; transition: all 0.2s;\">' +
+    '<button id="ai-chat-close" style="background: ' + closeIconBg + '; border: none; color: ' + closeIconColor + '; font-size: 20px; cursor: pointer; padding: 0; width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; transition: all 0.2s;">' +
     closeIconHtml +
     '</button>' +
     '</div>' +
-    '<div id=\"ai-chat-messages\" style=\"flex: 1; overflow-y: auto; padding: 24px; display: flex; flex-direction: column; gap: 24px; background: ' + chatBgColor + ';\"></div>' +
-    '<div style=\"padding: 20px 24px; border-top: 1px solid ' + inputAreaBorderColor + '; background: ' + inputAreaBgColor + ';\">' +
-    '<div id=\"ai-chat-typing\" style=\"display: none; color: ' + typingColor + '; font-size: 12px; margin-bottom: 12px; padding-left: 4px; font-weight: 500;\">AI is typing...</div>' +
-    '<div style=\"display: flex; gap: 12px; align-items: center; background: ' + inputBgColor + '; border-radius: 32px; padding: 6px 6px 6px 20px; border: 1px solid ' + inputBorderColor + '; transition: all 0.2s; box-shadow: 0 2px 6px rgba(0,0,0,0.02);\" onfocusin=\"this.style.boxShadow=\\'0 4px 12px rgba(0, 0, 0, 0.08) \\'; this.style.background=\\'#fff\\';\" onfocusout=\"this.style.boxShadow=\\'0 2px 6px rgba(0, 0, 0, 0.02) \\'; this.style.background=\\'' + inputBgColor + '\\';\">' +
-      '<input id=\"ai-chat-input\" type=\"text\" placeholder=\"' + cfg.placeholder + '\" style=\"flex: 1; border: none; font-size: 15px; outline: none; background: transparent; color: ' + inputTextColor + '; padding: 10px 0;\" />' +
-      '<button id=\"ai-chat-send\" style=\"background: ' + sendBtnBg + '; color: ' + sendBtnIconColor + '; border: none; padding: 0; width: 42px; height: 42px; border-radius: 50%; font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0; transition: all 0.2s;\">' +
-      sendIconHtml +
-      '</button>' +
-      '</div>' +
-      '</div>' +
-      (cfg.showBranding ? '<div style=\"padding: 8px; text-align: center; font-size: 11px; color: #d1d5db; background: ' + chatBgColor + ';\"><a href=\"' + (cfg.brandingUrl || 'https://bonsaimedia.nl') + '\" target=\"_blank\" style=\"color: inherit; text-decoration: none;\">' + (cfg.brandingText || 'Powered by Bonsai') + '</a></div>' : '');
+    '<div id="ai-chat-messages" style="flex: 1; overflow-y: auto; padding: 24px; display: flex; flex-direction: column; gap: 24px; background: ' + chatBgColor + ';"></div>' +
+    '<div style="padding: 20px 24px; border-top: 1px solid ' + inputAreaBorderColor + '; background: ' + inputAreaBgColor + ';">' +
+    '<div id="ai-chat-typing" style="display: none; color: ' + typingColor + '; font-size: 12px; margin-bottom: 12px; padding-left: 4px; font-weight: 500;">AI is typing...</div>' +
+    '<div style="display: flex; gap: 12px; align-items: center; background: ' + inputBgColor + '; border-radius: 32px; padding: 6px 6px 6px 20px; border: 1px solid ' + inputBorderColor + '; transition: all 0.2s; box-shadow: 0 2px 6px rgba(0,0,0,0.02);" onfocusin="this.style.boxShadow=\'0 4px 12px rgba(0, 0, 0, 0.08)\'; this.style.background=\'#fff\';" onfocusout="this.style.boxShadow=\'0 2px 6px rgba(0, 0, 0, 0.02)\'; this.style.background=\'' + inputBgColor + '\';">' +
+    '<input id="ai-chat-input" type="text" placeholder="' + cfg.placeholder + '" style="flex: 1; border: none; font-size: 15px; outline: none; background: transparent; color: ' + inputTextColor + '; padding: 10px 0;" />' +
+    '<button id="ai-chat-send" style="background: ' + sendBtnBg + '; color: ' + sendBtnIconColor + '; border: none; padding: 0; width: 42px; height: 42px; border-radius: 50%; font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0; transition: all 0.2s;">' +
+    sendIconHtml +
+    '</button>' +
+    '</div>' +
+    '</div>' +
+    (cfg.showBranding ? '<div style="padding: 8px; text-align: center; font-size: 11px; color: #d1d5db; background: ' + chatBgColor + ';"><a href="' + (cfg.brandingUrl || 'https://bonsaimedia.nl') + '" target="_blank" style="color: inherit; text-decoration: none;">' + (cfg.brandingText || 'Powered by Bonsai') + '</a></div>' : '');
 }
 
 function getChatWindowStyles(cfg) {
