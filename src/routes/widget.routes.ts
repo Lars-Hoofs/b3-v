@@ -231,15 +231,11 @@ export const createWidgetSchema = z.object({
   headerShadow: z.string().max(200).optional(),
   headerPadding: z.number().int().min(8).max(40).optional(),
 
-  // Advanced Launcher Builder
-  launcherMode: z.enum(["simple", "advanced"]).optional(),
-  launcherStructure: z.array(z.any()).optional(), // Recursive structure - validated on frontend
-
   // Advanced Chat Builder  
   chatMode: z.enum(["simple", "advanced"]).optional(),
   chatStructure: z.array(z.any()).optional(), // Recursive structure - validated on frontend
 
-  // Advanced
+  // Advanced Options
   customCss: z.string().max(10000).optional(),
   customJs: z.string().max(10000).optional(),
   allowedDomains: z.array(z.string()).optional(),
