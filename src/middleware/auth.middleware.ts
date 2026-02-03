@@ -31,6 +31,48 @@ export async function requireAuth(
       headers: headers,
     });
 
+    // Fallback: If no session found but we have multi-session cookies, try to validate them individually
+    // This handles cases where the multi-session plugin might be confused by the cookie format or prefix
+    if (!session && req.headers.cookie) {
+      const cookies = req.headers.cookie.split(';').map(c => c.trim());
+      const sessionCookies = cookies.filter(c => c.includes('session_token'));
+
+      if (sessionCookies.length > 0 && process.env.DEBUG_AUTH === 'true') {
+        console.log('[Auth] Attempting fallback validation for cookies:', sessionCookies.map(c => c.split('=')[0]));
+      }
+
+      for (const cookie of sessionCookies) {
+        // Extract value
+        const parts = cookie.split('=');
+        if (parts.length >= 2) {
+          const value = parts.slice(1).join('='); // Handle values with =
+
+          // Construct a header that looks like a single standard session
+          // We assume 'enterprise.session_token' based on config
+          // We also try with and without __Secure- prefix to be safe
+          const candidateHeaders = new Headers();
+
+          // Try 1: As enterprise.session_token (standard)
+          candidateHeaders.set('cookie', `enterprise.session_token=${value}`);
+          const s1 = await auth.api.getSession({ headers: candidateHeaders });
+          if (s1) {
+            session = s1;
+            console.log('[Auth] Recovered session via fallback (standard name)');
+            break;
+          }
+
+          // Try 2: __Secure-enterprise.session_token (production)
+          candidateHeaders.set('cookie', `__Secure-enterprise.session_token=${value}`);
+          const s2 = await auth.api.getSession({ headers: candidateHeaders });
+          if (s2) {
+            session = s2;
+            console.log('[Auth] Recovered session via fallback (secure name)');
+            break;
+          }
+        }
+      }
+    }
+
     // If no session from cookies, try Bearer token (for Postman/API clients)
     if (!session) {
       const authHeader = req.headers.authorization;
