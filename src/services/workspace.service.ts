@@ -129,8 +129,11 @@ export async function getWorkspace(workspaceId: string, userId: string) {
     throw new WorkspaceError("Workspace not found", 404);
   }
 
+  // Allow access if user is owner OR member
+  const isOwner = workspace.ownerId === userId;
   const isMember = workspace.members.some((m) => m.userId === userId);
-  if (!isMember) {
+
+  if (!isOwner && !isMember) {
     throw new WorkspaceError("Access denied", 403);
   }
 
@@ -141,12 +144,19 @@ export async function getUserWorkspaces(userId: string) {
   const workspaces = await prisma.workspace.findMany({
     where: {
       deletedAt: null,
-      members: {
-        some: {
-          userId,
-          deletedAt: null,
+      OR: [
+        {
+          members: {
+            some: {
+              userId,
+              deletedAt: null,
+            },
+          },
         },
-      },
+        {
+          ownerId: userId,
+        },
+      ],
     },
     include: {
       owner: {
@@ -178,19 +188,30 @@ export async function updateWorkspace(
   ipAddress?: string,
   userAgent?: string
 ) {
-  const member = await prisma.workspaceMember.findFirst({
-    where: {
-      workspaceId,
-      userId,
-      deletedAt: null,
-      role: {
-        in: [WorkspaceRole.OWNER, WorkspaceRole.ADMIN],
-      },
-    },
+  // Check if user is owner
+  const workspaceCheck = await prisma.workspace.findUnique({
+    where: { id: workspaceId },
+    select: { ownerId: true },
   });
 
-  if (!member) {
-    throw new WorkspaceError("Only workspace owners and admins can update the workspace", 403);
+  const isOwner = workspaceCheck?.ownerId === userId;
+
+  if (!isOwner) {
+    // If not owner, check if is admin member
+    const member = await prisma.workspaceMember.findFirst({
+      where: {
+        workspaceId,
+        userId,
+        deletedAt: null,
+        role: {
+          in: [WorkspaceRole.OWNER, WorkspaceRole.ADMIN],
+        },
+      },
+    });
+
+    if (!member) {
+      throw new WorkspaceError("Only workspace owners and admins can update the workspace", 403);
+    }
   }
 
   if (input.slug) {
