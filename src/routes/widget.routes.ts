@@ -22,6 +22,10 @@ export const createWidgetSchema = z.object({
   primaryColor: z.string().regex(/^#[0-9A-Fa-f]{6}$/).optional(),
   theme: z.enum(["light", "dark", "auto"]).optional(),
 
+  // Advanced Launcher Builder
+  launcherMode: z.enum(["simple", "advanced"]).optional(),
+  launcherStructure: z.array(z.any()).optional(), // Loose validation for recursive structure
+
   // Advanced Layout
   layoutMode: z.enum(["fixed", "percentage", "full-height", "full-width", "custom"]).optional(),
   widthPercentage: z.number().int().min(10).max(100).optional(),

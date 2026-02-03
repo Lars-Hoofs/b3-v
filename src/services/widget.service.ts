@@ -45,6 +45,10 @@ export async function createWidget(input: CreateWidgetInput) {
       primaryColor: widgetConfig.primaryColor || "#000000",
       theme: widgetConfig.theme || "light",
 
+      // Advanced Launcher Builder
+      launcherMode: widgetConfig.launcherMode || "simple",
+      launcherStructure: widgetConfig.launcherStructure,
+
       // Bubble customization
       bubbleIcon: widgetConfig.bubbleIcon || "RiChat1Fill",
       bubbleText: widgetConfig.bubbleText,

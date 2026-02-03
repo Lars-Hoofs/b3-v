@@ -340,6 +340,10 @@ model Widget {
   primaryColor  String    @default("#6366f1")
   theme         String    @default("light") // light, dark, auto
   
+  // Advanced Launcher Builder
+  launcherMode      String?   @default("simple") // simple, advanced
+  launcherStructure Json?     // Recursive structure for advanced launcher
+  
   // Advanced Layout
   layoutMode        String? // fixed, percentage, full-height, full-width, custom
   widthPercentage   Int?
