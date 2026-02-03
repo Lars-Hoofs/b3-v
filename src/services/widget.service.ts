@@ -567,8 +567,11 @@ export function generateWidgetScript(): string {
     };
     container.style.cssText += positions[cfg.position] || positions['bottom-right'];
     
-    // Check if using advanced launcher mode
-    const useAdvancedLauncher = cfg.launcherMode === 'advanced' && cfg.launcherStructure && cfg.launcherStructure.length > 0;
+    // Check if using advanced launcher mode with defensive null checks
+    const useAdvancedLauncher = cfg.launcherMode === 'advanced' && 
+                                 cfg.launcherStructure && 
+                                 Array.isArray(cfg.launcherStructure) &&
+                                 cfg.launcherStructure.length > 0;
     
     // Create bubble based on widgetType and launcherMode
     const widgetType = cfg.widgetType || 'bubble';

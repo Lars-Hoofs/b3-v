@@ -380,6 +380,10 @@ router.get("/config/:installCode", async (req, res) => {
       primaryColor: widget.primaryColor,
       theme: widget.theme,
 
+      // Advanced Launcher Builder (CRITICAL for advanced launcher rendering)
+      launcherMode: widget.launcherMode,
+      launcherStructure: widget.launcherStructure,
+
       // Advanced Layout
       layoutMode: widget.layoutMode,
       widthPercentage: widget.widthPercentage,
