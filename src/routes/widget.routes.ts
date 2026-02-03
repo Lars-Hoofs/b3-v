@@ -26,6 +26,10 @@ export const createWidgetSchema = z.object({
   launcherMode: z.enum(["simple", "advanced"]).optional(),
   launcherStructure: z.array(z.any()).optional(), // Loose validation for recursive structure
 
+  // Advanced Chat Builder
+  chatMode: z.enum(["simple", "advanced"]).optional(),
+  chatStructure: z.array(z.any()).optional(), // Loose validation for recursive chat block structure
+
   // Advanced Layout
   layoutMode: z.enum(["fixed", "percentage", "full-height", "full-width", "custom"]).optional(),
   widthPercentage: z.number().int().min(10).max(100).optional(),
@@ -230,10 +234,6 @@ export const createWidgetSchema = z.object({
   }).optional(),
   headerShadow: z.string().max(200).optional(),
   headerPadding: z.number().int().min(8).max(40).optional(),
-
-  // Advanced Chat Builder  
-  chatMode: z.enum(["simple", "advanced"]).optional(),
-  chatStructure: z.array(z.any()).optional(), // Recursive structure - validated on frontend
 
   // Advanced Options
   customCss: z.string().max(10000).optional(),
