@@ -18,11 +18,6 @@ export async function requireAuth(
   next: NextFunction
 ) {
   try {
-    console.log('[Auth] Headers:', {
-      cookie: req.headers.cookie?.substring(0, 100),
-      authorization: req.headers.authorization?.substring(0, 50),
-    });
-    
     // Try cookie-based session first (Better Auth default)
     let session = await auth.api.getSession({
       headers: req.headers as any,
@@ -31,18 +26,16 @@ export async function requireAuth(
     // If no session from cookies, try Bearer token (for Postman/API clients)
     if (!session) {
       const authHeader = req.headers.authorization;
-      console.log('[Auth] No cookie session, checking Bearer token:', authHeader?.substring(0, 50));
       if (authHeader?.startsWith('Bearer ')) {
         const token = authHeader.substring(7);
-        console.log('[Auth] Using Bearer token:', token.substring(0, 20) + '...');
-        
+
         // Create headers object with the session token as a cookie
         // Better Auth uses multi-session format
         const headers = {
           ...req.headers,
           cookie: `enterprise.session_token_multi-${token.toLowerCase()}=${token}`,
         };
-        
+
         session = await auth.api.getSession({
           headers: headers as any,
         });
@@ -50,6 +43,14 @@ export async function requireAuth(
     }
 
     if (!session) {
+      // Log alleen bij debug mode om spam te voorkomen
+      if (process.env.DEBUG_AUTH === 'true') {
+        console.warn('[Auth] No session found', {
+          path: req.path,
+          hasCookie: !!req.headers.cookie,
+          hasAuthHeader: !!req.headers.authorization,
+        });
+      }
       return res.status(401).json({
         error: "Unauthorized",
         message: "You must be logged in to access this resource. Please provide session token in Cookie or Authorization header.",
@@ -60,7 +61,12 @@ export async function requireAuth(
     req.session = session.session;
     next();
   } catch (error) {
-    console.error("Auth middleware error:", error);
+    // Log met meer context voor debugging
+    console.error("Auth middleware error:", {
+      path: req.path,
+      error: (error as Error).message,
+      stack: process.env.NODE_ENV === 'development' ? (error as Error).stack : undefined,
+    });
     return res.status(401).json({
       error: "Unauthorized",
       message: "Invalid or expired session",

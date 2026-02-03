@@ -25,8 +25,12 @@ class SocketService {
         credentials: false  // Can't use credentials with origin: "*"
       },
       transports: ['websocket', 'polling'],
-      pingTimeout: 60000,
-      pingInterval: 25000
+      // ✅ Verhoogde timeouts voor stabielere verbindingen
+      pingTimeout: 120000,    // 2 minuten (was 60s) - voorkomt disconnects bij langzame netwerken
+      pingInterval: 30000,    // 30 seconden (was 25s) - regelmatige heartbeat
+      connectTimeout: 45000,  // 45 seconden timeout voor initial connect
+      // ✅ Upgrade timeout voor polling -> websocket transition
+      upgradeTimeout: 30000,
     });
 
     // Authentication middleware (optional - allows anonymous visitors)

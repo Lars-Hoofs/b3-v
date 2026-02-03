@@ -18,10 +18,11 @@ export const auth = betterAuth({
     maxPasswordLength: 128,
   },
   session: {
-    expiresIn: 60 * 60 * 24 * 7,
-    updateAge: 60 * 60 * 24,
+    expiresIn: 60 * 60 * 24 * 7, // 7 dagen sessie geldigheid
+    updateAge: 60 * 60, // Vernieuwd sessie elke uur (was 24 uur - te lang)
     cookieCache: {
-      enabled: false,
+      enabled: true, // ✅ Cookie caching ingeschakeld - voorkomt race conditions
+      maxAge: 60 * 5, // Cache voor 5 minuten - vermindert database lookups
     },
   },
   account: {
@@ -119,7 +120,7 @@ export const auth = betterAuth({
       impersonationSessionDuration: 60 * 60,
     }),
     multiSession({
-      maximumSessions: 10,
+      maximumSessions: 25, // ✅ Verhoogd van 10 - voorkomt uitloggen bij multiple devices/browsers
     }),
     organization({
       allowUserToCreateOrganization: true,
