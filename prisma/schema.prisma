@@ -344,6 +344,10 @@ model Widget {
   launcherMode      String?   @default("simple") // simple, advanced
   launcherStructure Json?     // Recursive structure for advanced launcher
   
+  // Advanced Chat Builder
+  chatMode          String?   @default("simple") // simple, advanced
+  chatStructure     Json?     // Recursive structure for advanced chat layout
+  
   // Advanced Layout
   layoutMode        String? // fixed, percentage, full-height, full-width, custom
   widthPercentage   Int?

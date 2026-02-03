@@ -384,6 +384,10 @@ router.get("/config/:installCode", async (req, res) => {
       launcherMode: widget.launcherMode,
       launcherStructure: widget.launcherStructure,
 
+      // Advanced Chat Builder
+      chatMode: widget.chatMode,
+      chatStructure: widget.chatStructure,
+
       // Advanced Layout
       layoutMode: widget.layoutMode,
       widthPercentage: widget.widthPercentage,

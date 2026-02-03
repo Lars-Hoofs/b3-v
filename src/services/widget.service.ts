@@ -49,6 +49,10 @@ export async function createWidget(input: CreateWidgetInput) {
       launcherMode: widgetConfig.launcherMode || "simple",
       launcherStructure: widgetConfig.launcherStructure,
 
+      // Advanced Chat Builder
+      chatMode: widgetConfig.chatMode || "simple",
+      chatStructure: widgetConfig.chatStructure,
+
       // Bubble customization
       bubbleIcon: widgetConfig.bubbleIcon || "RiChat1Fill",
       bubbleText: widgetConfig.bubbleText,
