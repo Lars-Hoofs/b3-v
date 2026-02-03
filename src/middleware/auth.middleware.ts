@@ -51,14 +51,19 @@ export async function requireAuth(
     }
 
     if (!session) {
-      // Log alleen bij debug mode om spam te voorkomen
-      if (process.env.DEBUG_AUTH === 'true') {
-        console.warn('[Auth] No session found', {
-          path: req.path,
-          hasCookie: !!req.headers.cookie,
-          hasAuthHeader: !!req.headers.authorization,
-        });
-      }
+      // Force log for debugging 401 issues
+      console.warn('[Auth] No session found (401)', {
+        path: req.path,
+        method: req.method,
+        origin: req.headers.origin,
+        referer: req.headers.referer,
+        hasCookie: !!req.headers.cookie,
+        cookieNames: req.headers.cookie ? req.headers.cookie.split(';').map(c => c.trim().split('=')[0]) : [],
+        hasAuthHeader: !!req.headers.authorization,
+        // Log headers for debugging proxy issues (exclude sensitive values)
+        headers: Object.keys(req.headers).filter(k => k !== 'cookie' && k !== 'authorization'),
+      });
+
       return res.status(401).json({
         error: "Unauthorized",
         message: "You must be logged in to access this resource. Please provide session token in Cookie or Authorization header.",
