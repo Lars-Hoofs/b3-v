@@ -880,7 +880,119 @@ function getCustomBoxHTML(cfg) {
   return html;
 }
 
+// ===== RENDER CHAT BLOCK (for Advanced Chat Builder) =====
+function renderChatBlock(block, cfg, depth) {
+  if (!block) return '';
+  
+  depth = depth || 0;
+  var blockId = 'chat-block-' + block.id;
+  
+  // Convert style object to CSS string
+  var baseStyles = '';
+  if (block.style) {
+    for (var key in block.style) {
+      if (block.style.hasOwnProperty(key)) {
+        var cssKey = key.replace(/([A-Z])/g, '-$1').toLowerCase();
+        baseStyles += cssKey + ': ' + block.style[key] + '; ';
+      }
+    }
+  }
+  
+  // Mobile hidden class
+  var mobileHidden = block.mobileHidden ? ' class="chat-mobile-hidden"' : '';
+  
+  var content = '';
+  
+  switch (block.type) {
+    case 'header':
+      // Header block with title, subtitle, close button
+      var headerStyles = 'padding: 20px 24px; display: flex; align-items: center; justify-content: space-between; ' + baseStyles;
+      var titleHtml = '<div style="font-weight: 700; font-size: 18px;">' + (cfg.headerTitle || 'Chat') + '</div>';
+      var subtitleHtml = cfg.headerSubtitle ? '<div style="font-size: 13px; opacity: 0.6; margin-top: 2px;">' + cfg.headerSubtitle + '</div>' : '';
+      var closeBtn = '<button onclick="document.getElementById(\\'ai-chat-window\\').style.display=\\'none\\'; document.getElementById(\\'ai-chat-bubble\\').style.display=\\'flex\\';" style="background: transparent; border: none; font-size: 20px; cursor: pointer; padding: 8px;">✕</button>';
+      content = '<div style="' + headerStyles + '"><div>' + titleHtml + subtitleHtml + '</div>' + closeBtn + '</div>';
+      return content;
+
+    case 'messages':
+      // Messages area - scrollable container for chat messages
+      var msgStyles = 'flex: 1; overflow-y: auto; padding: 24px; display: flex; flex-direction: column; gap: 24px; ' + baseStyles;
+      return '<div id="ai-chat-messages" style="' + msgStyles + '"></div>';
+
+    case 'input':
+      // Input field with send button
+      var inputStyles = 'padding: 20px 24px; border-top: 1px solid rgba(0,0,0,0.05); ' + baseStyles;
+      var inputBg = cfg.inputBackgroundColor || '#f3f4f6';
+      var placeholder = block.placeholder || cfg.placeholder || 'Type a message...';
+      var inputHtml = '<div style="' + inputStyles + '">' +
+        '<div id="ai-chat-typing" style="display: none; color: #9ca3af; font-size: 12px; margin-bottom: 12px;">AI is typing...</div>' +
+        '<div style="display: flex; gap: 12px; align-items: center; background: ' + inputBg + '; border-radius: 32px; padding: 6px 6px 6px 20px;">' +
+        '<input id="ai-chat-input" type="text" placeholder="' + placeholder + '" style="flex: 1; border: none; font-size: 15px; outline: none; background: transparent; padding: 10px 0;" />' +
+        '<button id="ai-chat-send" style="background: transparent; border: none; padding: 0; width: 42px; height: 42px; border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center;">' +
+        '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>' +
+        '</button></div></div>';
+      return inputHtml;
+
+    case 'container':
+      // Flexible container for custom layouts
+      var containerStyles = baseStyles || 'padding: 10px;';
+      var childContent = '';
+      if (block.children && block.children.length > 0) {
+        for (var i = 0; i < block.children.length; i++) {
+          childContent += renderChatBlock(block.children[i], cfg, depth + 1);
+        }
+      }
+      return '<div id="' + blockId + '"' + mobileHidden + ' style="' + containerStyles + '">' + childContent + '</div>';
+
+    case 'text':
+      // Static text block
+      var textStyles = 'padding: 8px 16px; ' + baseStyles;
+      return '<div id="' + blockId + '"' + mobileHidden + ' style="' + textStyles + '">' + (block.content || '') + '</div>';
+
+    case 'button':
+      // Clickable button
+      var btnStyles = 'padding: 8px 16px; border: none; cursor: pointer; border-radius: 8px; ' + baseStyles;
+      var onClick = '';
+      if (block.onClick === 'close-chat') {
+        onClick = ' onclick="document.getElementById(\\'ai-chat-window\\').style.display=\\'none\\'; document.getElementById(\\'ai-chat-bubble\\').style.display=\\'flex\\';"';
+      } else if (block.onClick === 'open-url' && block.url) {
+        onClick = ' onclick="window.open(\\'' + block.url + '\\', \\'_blank\\');"';
+      }
+      return '<button id="' + blockId + '"' + mobileHidden + onClick + ' style="' + btnStyles + '">' + (block.content || 'Button') + '</button>';
+
+    case 'divider':
+      // Separator line
+      var divStyles = 'height: 1px; background: rgba(0,0,0,0.1); ' + baseStyles;
+      return '<div id="' + blockId + '" style="' + divStyles + '"></div>';
+
+    case 'branding':
+      // Branding footer
+      var brandStyles = 'padding: 8px; text-align: center; font-size: 11px; color: #d1d5db; ' + baseStyles;
+      var brandUrl = cfg.brandingUrl || 'https://bonsaimedia.nl';
+      var brandText = block.content || cfg.brandingText || 'Powered by Bonsai';
+      return '<div id="' + blockId + '" style="' + brandStyles + '"><a href="' + brandUrl + '" target="_blank" style="color: inherit; text-decoration: none;">' + brandText + '</a></div>';
+
+    default:
+      return '';
+  }
+}
+
 function getChatWindowHTML(cfg, apiUrl) {
+  // === ADVANCED CHAT MODE: Render chatStructure ===
+  const useAdvancedChat = cfg.chatMode === 'advanced' && 
+                           cfg.chatStructure && 
+                           Array.isArray(cfg.chatStructure) &&
+                           cfg.chatStructure.length > 0;
+  
+  if (useAdvancedChat) {
+    // Render custom chat structure
+    let chatHtml = '';
+    for (var i = 0; i < cfg.chatStructure.length; i++) {
+      chatHtml += renderChatBlock(cfg.chatStructure[i], cfg, 0);
+    }
+    return chatHtml;
+  }
+  
+  // === SIMPLE/LEGACY MODE: Default chat layout ===
   // Close button customization
   // Default to black icon if header is white, otherwise match text color
   const closeIconColor = cfg.headerCloseIconColor || (cfg.headerBackgroundColor === '#ffffff' ? '#000000' : cfg.headerTextColor);
