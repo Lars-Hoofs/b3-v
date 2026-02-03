@@ -18,9 +18,17 @@ export async function requireAuth(
   next: NextFunction
 ) {
   try {
+    // Convert Express headers to Web Standard Headers for Better Auth
+    const headers = new Headers();
+    Object.entries(req.headers).forEach(([key, value]) => {
+      if (value) {
+        headers.set(key, Array.isArray(value) ? value[0] : value as string);
+      }
+    });
+
     // Try cookie-based session first (Better Auth default)
     let session = await auth.api.getSession({
-      headers: req.headers as any,
+      headers: headers,
     });
 
     // If no session from cookies, try Bearer token (for Postman/API clients)
@@ -79,9 +87,17 @@ export function optionalAuth(
   res: Response,
   next: NextFunction
 ) {
+  // Convert Express headers to Web Standard Headers
+  const headers = new Headers();
+  Object.entries(req.headers).forEach(([key, value]) => {
+    if (value) {
+      headers.set(key, Array.isArray(value) ? value[0] : value as string);
+    }
+  });
+
   auth.api
     .getSession({
-      headers: req.headers as any,
+      headers: headers,
     })
     .then((session) => {
       if (session) {

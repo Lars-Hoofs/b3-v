@@ -55,7 +55,7 @@ router.get("/conversations/:id/messages", async (req, res) => {
   try {
     const page = parseInt(req.query.page as string) || 1;
     const pageSize = parseInt(req.query.pageSize as string) || 50;
-    
+
     const result = await chatService.getConversationMessages(
       req.params.id,
       page,
@@ -80,25 +80,33 @@ export const sendMessageSchema = z.object({
 router.post("/messages", async (req, res) => {
   try {
     const data = sendMessageSchema.parse(req.body);
-    
+
     // If role is AGENT, require authentication and extract user ID from session
     if (data.role === "AGENT") {
       // Import auth dynamically to avoid circular dependencies
       const { auth } = await import("../lib/auth");
-      
+
+      // Convert Express headers to Web Standard Headers
+      const headers = new Headers();
+      Object.entries(req.headers).forEach(([key, value]) => {
+        if (value) {
+          headers.set(key, Array.isArray(value) ? value[0] : value as string);
+        }
+      });
+
       // Get session from Better Auth (uses cookies)
       const session = await auth.api.getSession({
-        headers: req.headers as any,
+        headers: headers,
       });
-      
+
       if (!session || !session.user) {
         return res.status(401).json({ error: "Authentication required for agent messages" });
       }
-      
+
       // Automatically set senderId from authenticated user
       data.senderId = session.user.id;
     }
-    
+
     const result = await chatService.sendMessage(data);
     res.status(201).json(result);
   } catch (error: any) {

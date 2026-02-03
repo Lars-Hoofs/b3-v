@@ -12,8 +12,16 @@ const router = Router();
  */
 router.get("/session", async (req, res) => {
   try {
+    // Convert Express headers to Web Standard Headers
+    const headers = new Headers();
+    Object.entries(req.headers).forEach(([key, value]) => {
+      if (value) {
+        headers.set(key, Array.isArray(value) ? value[0] : value as string);
+      }
+    });
+
     const session = await auth.api.getSession({
-      headers: req.headers as any,
+      headers: headers,
     });
 
     if (!session) {
