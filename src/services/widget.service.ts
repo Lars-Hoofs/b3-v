@@ -448,6 +448,74 @@ export function generateWidgetScript(): string {
   
   loadRemixiconCSS();
 
+  // Recursive function to render launcher blocks (like frontend InteractiveChatPreview)
+  function renderLauncherBlock(block, depth) {
+    if (!block || !block.id) return '';
+    
+    depth = depth || 0;
+    
+    // Convert style object to CSS string
+    function styleToString(styleObj) {
+      if (!styleObj || typeof styleObj !== 'object') return '';
+      return Object.keys(styleObj).map(function(key) {
+        // Convert camelCase to kebab-case
+        var cssKey = key.replace(/([A-Z])/g, '-$1').toLowerCase();
+        return cssKey + ': ' + styleObj[key];
+      }).join('; ');
+    }
+    
+    // Base element styles
+    var baseStyles = block.style ? styleToString(block.style) : '';
+    
+    // Add hover styles if present
+    var blockId = 'launcher-block-' + block.id;
+    if (block.hoverStyle) {
+      var hoverCss = '#' + blockId + ':hover { ' + styleToString(block.hoverStyle) + ' }';
+      var hoverStyleEl = document.createElement('style');
+      hoverStyleEl.textContent = hoverCss;
+      document.head.appendChild(hoverStyleEl);
+    }
+    
+    // Generate content based on block type
+    var content = '';
+    
+    if (block.type === 'icon' && block.content) {
+      // Render icon
+      var iconColor = (block.style && block.style.color) || 'currentColor';
+      var iconSize = (block.style && block.style.width) ? parseInt(block.style.width) : 24;
+      content = getIconHtml(block.content, iconSize, iconColor);
+    } else if (block.type === 'text' && block.content) {
+      // Render text
+      content = block.content;
+    } else if (block.type === 'image' && block.content) {
+      // Render image
+      content = '<img src=\"' + block.content + '\" style=\"display: block; max-width: 100%; height: auto;\" />';
+    } else if (block.type === 'container' || block.type === 'row' || block.type === 'column') {
+      // Render children recursively
+      if (block.children && block.children.length > 0) {
+        content = block.children.map(function(child) {
+          return renderLauncherBlock(child, depth + 1);
+        }).join('');
+      }
+    }
+    
+    // Handle onClick
+    var onClick = '';
+    if (block.onClick) {
+      if (block.onClick === 'toggle-chat') {
+        onClick = ' onclick=\"document.getElementById(\\'ai-chat-window\\').style.display=\\'flex\\'; document.getElementById(\\'ai-chat-bubble\\').style.display=\\'none\\'; if (typeof initializeChat === \\'function\\') initializeChat(widgetConfig, apiUrl);\" style=\"cursor: pointer;\"';
+      } else if (block.onClick === 'open-url' && block.url) {
+        onClick = ' onclick=\"window.open(\\''+  block.url + '\\', \\'_blank\\')\" style=\"cursor: pointer;\"';
+      }
+    }
+    
+    // Mobile hidden class
+    var mobileHidden = block.mobileHidden ? ' class=\"launcher-mobile-hidden\"' : '';
+    
+    // Combine everything
+    return '<div id=\"' + blockId + '\"' + mobileHidden + onClick + ' style=\"' + baseStyles + '\">' + content + '</div>';
+  }
+
   function renderWidget(cfg, apiUrl) {
     // Inject common styles
     if (!document.getElementById('ai-chat-common-styles')) {
@@ -499,12 +567,33 @@ export function generateWidgetScript(): string {
     };
     container.style.cssText += positions[cfg.position] || positions['bottom-right'];
     
-    // Create bubble based on widgetType
+    // Check if using advanced launcher mode
+    const useAdvancedLauncher = cfg.launcherMode === 'advanced' && cfg.launcherStructure && cfg.launcherStructure.length > 0;
+    
+    // Create bubble based on widgetType and launcherMode
     const widgetType = cfg.widgetType || 'bubble';
     const bubble = document.createElement('div');
     bubble.id = 'ai-chat-bubble';
     
-    if (widgetType === 'searchbar') {
+    if (useAdvancedLauncher) {
+      // Advanced Launcher: Render the full launcher structure
+      bubble.style.cssText = 'display: flex; flex-direction: column; gap: 0; position: relative;';
+      
+      // Add mobile hidden CSS
+      if (!document.getElementById('launcher-mobile-hidden-style')) {
+        const mobileStyle = document.createElement('style');
+        mobileStyle.id = 'launcher-mobile-hidden-style';
+        mobileStyle.textContent = '@media (max-width: 768px) { .launcher-mobile-hidden { display: none !important; } }';
+        document.head.appendChild(mobileStyle);
+      }
+      
+      // Render each top-level block
+      let launcherHtml = '';
+      for (var i = 0; i < cfg.launcherStructure.length; i++) {
+        launcherHtml += renderLauncherBlock(cfg.launcherStructure[i], 0);
+      }
+      bubble.innerHTML = launcherHtml;
+    } else if (widgetType === 'searchbar') {
       bubble.style.cssText = getSearchbarStyles(cfg);
       bubble.innerHTML = getSearchbarHTML(cfg);
     } else if (widgetType === 'custom-box') {
@@ -515,6 +604,7 @@ export function generateWidgetScript(): string {
       bubble.style.cssText = getBubbleStyles(cfg);
       bubble.innerHTML = getBubbleHTML(cfg);
     }
+
     
     
     // Chat window
