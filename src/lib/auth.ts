@@ -95,7 +95,9 @@ export const auth = betterAuth({
   },
   cookies: {
     sessionToken: {
-      name: "enterprise.session_token",
+      // NOTE: We do NOT set the name here because the 'multiSession' plugin
+      // automatically handles cookie naming (e.g. enterprise.session_token_multi-...)
+      // Setting a fixed name here breaks multi-session support.
       options: {
         httpOnly: true,
         sameSite: "lax",
