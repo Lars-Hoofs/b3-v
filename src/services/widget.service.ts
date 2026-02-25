@@ -503,21 +503,21 @@ export function generateWidgetScript(): string {
       }
     }
     
-    // Handle onClick
-    var onClick = '';
+    // Handle onClick - store action as data attribute, attach via JS after render
+    var clickAttr = '';
     if (block.onClick) {
-      if (block.onClick === 'toggle-chat') {
-        onClick = " onclick=\"document.getElementById(&apos;ai-chat-window&apos;).style.display=&apos;flex&apos;; document.getElementById(&apos;ai-chat-bubble&apos;).style.display=&apos;none&apos;; if (typeof initializeChat === &apos;function&apos;) initializeChat(widgetConfig, apiUrl);\" style=\"cursor: pointer;\"";
-      } else if (block.onClick === 'open-url' && block.url) {
-        onClick = " onclick=\"window.open(&apos;" + block.url + "&apos;, &apos;_blank&apos;)\" style=\"cursor: pointer;\"";
+      clickAttr = ' data-click-action="' + block.onClick + '"';
+      if (block.onClick === 'open-url' && block.url) {
+        clickAttr += ' data-click-url="' + block.url + '"';
       }
+      clickAttr += ' style="cursor: pointer;"';
     }
     
     // Mobile hidden class
-    var mobileHidden = block.mobileHidden ? ' class=\"launcher-mobile-hidden\"' : '';
+    var mobileHidden = block.mobileHidden ? ' class="launcher-mobile-hidden"' : '';
     
     // Combine everything
-    return '<div id=\"' + blockId + '\"' + mobileHidden + onClick + ' style=\"' + baseStyles + '\">' + content + '</div>';
+    return '<div id="' + blockId + '"' + mobileHidden + clickAttr + ' style="' + baseStyles + '">' + content + '</div>';
   }
 
   function renderWidget(cfg, apiUrl) {
@@ -600,6 +600,35 @@ export function generateWidgetScript(): string {
         launcherHtml += renderLauncherBlock(cfg.launcherStructure[i], 0);
       }
       bubble.innerHTML = launcherHtml;
+      
+      // Attach click handlers for launcher blocks via addEventListener (avoids inline onclick escape issues)
+      setTimeout(function() {
+        var clickables = bubble.querySelectorAll('[data-click-action]');
+        for (var ci = 0; ci < clickables.length; ci++) {
+          (function(el) {
+            var action = el.getAttribute('data-click-action');
+            el.addEventListener('click', function(e) {
+              e.stopPropagation();
+              if (action === 'toggle-chat' || action === 'open-chat') {
+                var chatWin = document.getElementById('ai-chat-window');
+                var chatBubble = document.getElementById('ai-chat-bubble');
+                if (chatWin) chatWin.style.display = 'flex';
+                if (chatBubble) chatBubble.style.display = 'none';
+                if (typeof initializeChat === 'function') initializeChat(widgetConfig, apiUrl);
+              } else if (action === 'open-url') {
+                var url = el.getAttribute('data-click-url');
+                if (url) window.open(url, '_blank');
+              } else if (action === 'email') {
+                var url = el.getAttribute('data-click-url');
+                if (url) window.location.href = url;
+              } else if (action === 'phone') {
+                var url = el.getAttribute('data-click-url');
+                if (url) window.location.href = url;
+              }
+            });
+          })(clickables[ci]);
+        }
+      }, 0);
     } else if (widgetType === 'searchbar') {
       bubble.style.cssText = getSearchbarStyles(cfg);
       bubble.innerHTML = getSearchbarHTML(cfg);
@@ -960,13 +989,15 @@ function renderChatBlock(block, cfg, depth) {
 
     case 'button':
       const btnStyle = \`padding: 8px 16px; border: none; cursor: pointer; border-radius: 8px; \${baseStyles}\`;
-      let onClick = '';
+      let clickData = '';
       if (block.onClick === 'close-chat') {
-        onClick = " onclick=\"window.parent.postMessage({type: &apos;bonsai-widget-close&apos;}, &apos;*&apos;)\"";
+        clickData = ' data-chat-action="close-chat"';
       } else if (block.onClick === 'open-url' && block.url) {
-        onClick = " onclick=\"window.open(&apos;" + block.url + "&apos;, &apos;_blank&apos;)\"";
+        clickData = ' data-chat-action="open-url" data-chat-url="' + block.url + '"';
+      } else if (block.onClick === 'send-message') {
+        clickData = ' data-chat-action="send-message"';
       }
-      content = \`<button id="\${blockId}"\${mobileHidden}\${onClick} style="\${btnStyle}">\${block.content || 'Button'}</button>\`;
+      content = \`<button id="\${blockId}"\${mobileHidden}\${clickData} style="\${btnStyle}">\${block.content || 'Button'}</button>\`;
       break;
       
     case 'divider':
