@@ -670,27 +670,6 @@ export function generateWidgetScript(): string {
     }
   }
   
-  function getBubbleHTML(cfg) {
-    const iconColor = cfg.bubbleIconColor || cfg.bubbleTextColor;
-    
-    if (cfg.bubbleIcon && cfg.bubbleText) {
-      const iconHtml = getIconHtml(cfg.bubbleIcon, 24, iconColor);
-      return '<div style="display: flex; align-items: center; gap: 8px; justify-content: ' + (cfg.bubbleIconPosition === 'left' ? 'flex-start' : cfg.bubbleIconPosition === 'right' ? 'flex-end' : 'center') + ';">' +
-        iconHtml +
-        '<span class="ai-bubble-text" style="transition: color 0.2s;">' + cfg.bubbleText + '</span>' +
-        '</div>';
-    } else if (cfg.bubbleIcon) {
-      const justifyContent = cfg.bubbleIconPosition === 'left' ? 'flex-start' : cfg.bubbleIconPosition === 'right' ? 'flex-end' : 'center';
-      const iconHtml = getIconHtml(cfg.bubbleIcon, 24, iconColor);
-      return '<div style="display: flex; width: 100%; justify-content: ' + justifyContent + ';">' +
-        iconHtml +
-        '</div>';
-    } else if (cfg.bubbleText) {
-      return '<span class="ai-bubble-text" style="transition: color 0.2s;">' + cfg.bubbleText + '</span>';
-    } else {
-      return '<svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor" style="color: ' + iconColor + ';"><path d="M10 3h4a8 8 0 1 1 0 16v3.5c-5-2-12-5-12-11.5a8 8 0 0 1 8-8Z"/></svg>';
-    }
-  }
   
 
   function getBubbleStyles(cfg) {
@@ -881,7 +860,7 @@ function getCustomBoxHTML(cfg) {
 }
 
 // ===== RENDER CHAT BLOCK (for Advanced Chat Builder) =====
-function renderChatBlock(block: any, cfg: any, depth: number = 0): string {
+function renderChatBlock(block, cfg, depth) {
   const baseStyles = Object.entries(block.style || {})
     .map(([k, v]) => \`\${k.replace(/[A-Z]/g, m => '-' + m.toLowerCase())}: \${v}\`)
     .join('; ');
@@ -890,7 +869,7 @@ function renderChatBlock(block: any, cfg: any, depth: number = 0): string {
   const blockId = 'chat-block-' + ((block.id) || Math.random().toString(36).substr(2, 9));
   
   // Render children
-  const childrenHtml = (block.children || []).map((c: any) => renderChatBlock(c, cfg, depth + 1)).join('');
+  const childrenHtml = (block.children || []).map(function(c) { return renderChatBlock(c, cfg, depth + 1); }).join('');
 
   let content = '';
 
@@ -1756,6 +1735,6 @@ function playNotificationSound() {
 const script = document.createElement('script');
 script.src = 'https://cdn.socket.io/4.6.1/socket.io.min.js';
 document.head.appendChild(script);
-}) ();
+})();
 `;
 }
