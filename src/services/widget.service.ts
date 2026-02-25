@@ -507,9 +507,9 @@ export function generateWidgetScript(): string {
     var onClick = '';
     if (block.onClick) {
       if (block.onClick === 'toggle-chat') {
-        onClick = ' onclick=\"document.getElementById(\\'ai-chat-window\\').style.display=\\'flex\\'; document.getElementById(\\'ai-chat-bubble\\').style.display=\\'none\\'; if (typeof initializeChat === \\'function\\') initializeChat(widgetConfig, apiUrl);\" style=\"cursor: pointer;\"';
+        onClick = " onclick=\"document.getElementById(&apos;ai-chat-window&apos;).style.display=&apos;flex&apos;; document.getElementById(&apos;ai-chat-bubble&apos;).style.display=&apos;none&apos;; if (typeof initializeChat === &apos;function&apos;) initializeChat(widgetConfig, apiUrl);\" style=\"cursor: pointer;\"";
       } else if (block.onClick === 'open-url' && block.url) {
-        onClick = ' onclick=\"window.open(\\''+  block.url + '\\', \\'_blank\\')\" style=\"cursor: pointer;\"';
+        onClick = " onclick=\"window.open(&apos;" + block.url + "&apos;, &apos;_blank&apos;)\" style=\"cursor: pointer;\"";
       }
     }
     
@@ -962,9 +962,9 @@ function renderChatBlock(block, cfg, depth) {
       const btnStyle = \`padding: 8px 16px; border: none; cursor: pointer; border-radius: 8px; \${baseStyles}\`;
       let onClick = '';
       if (block.onClick === 'close-chat') {
-        onClick = ' onclick="window.parent.postMessage({type: \\'bonsai-widget-close\\'}, \\'*\\')"';
+        onClick = " onclick=\"window.parent.postMessage({type: &apos;bonsai-widget-close&apos;}, &apos;*&apos;)\"";
       } else if (block.onClick === 'open-url' && block.url) {
-        onClick = ' onclick="window.open(\\'' + block.url + '\\', \\'_blank\\')"';
+        onClick = " onclick=\"window.open(&apos;" + block.url + "&apos;, &apos;_blank&apos;)\"";
       }
       content = \`<button id="\${blockId}"\${mobileHidden}\${onClick} style="\${btnStyle}">\${block.content || 'Button'}</button>\`;
       break;
@@ -1104,7 +1104,7 @@ function getChatWindowHTML(cfg, apiUrl) {
     '<div id="ai-chat-messages" style="flex: 1; overflow-y: auto; padding: 24px; display: flex; flex-direction: column; gap: 24px; background: ' + chatBgColor + ';"></div>' +
     '<div style="padding: 20px 24px; border-top: 1px solid ' + inputAreaBorderColor + '; background: ' + inputAreaBgColor + ';">' +
     '<div id="ai-chat-typing" style="display: none; color: ' + typingColor + '; font-size: 12px; margin-bottom: 12px; padding-left: 4px; font-weight: 500;">AI is typing...</div>' +
-    '<div style="display: flex; gap: 12px; align-items: center; background: ' + inputBgColor + '; border-radius: 32px; padding: 6px 6px 6px 20px; border: 1px solid ' + inputBorderColor + '; transition: all 0.2s; box-shadow: 0 2px 6px rgba(0,0,0,0.02);" onfocusin="this.style.boxShadow=\'0 4px 12px rgba(0, 0, 0, 0.08)\'; this.style.background=\'#fff\';" onfocusout="this.style.boxShadow=\'0 2px 6px rgba(0, 0, 0, 0.02)\'; this.style.background=\'' + inputBgColor + '\';">' +
+    '<div style="display: flex; gap: 12px; align-items: center; background: ' + inputBgColor + '; border-radius: 32px; padding: 6px 6px 6px 20px; border: 1px solid ' + inputBorderColor + '; transition: all 0.2s; box-shadow: 0 2px 6px rgba(0,0,0,0.02);" onfocusin="this.style.boxShadow=&apos;0 4px 12px rgba(0, 0, 0, 0.08)&apos;; this.style.background=&apos;#fff&apos;;" onfocusout="this.style.boxShadow=&apos;0 2px 6px rgba(0, 0, 0, 0.02)&apos;; this.style.background=&apos;' + inputBgColor + '&apos;;">' +
     '<input id="ai-chat-input" type="text" placeholder="' + cfg.placeholder + '" style="flex: 1; border: none; font-size: 15px; outline: none; background: transparent; color: ' + inputTextColor + '; padding: 10px 0;" />' +
     '<button id="ai-chat-send" style="background: ' + sendBtnBg + '; color: ' + sendBtnIconColor + '; border: none; padding: 0; width: 42px; height: 42px; border-radius: 50%; font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0; transition: all 0.2s;">' +
     sendIconHtml +
