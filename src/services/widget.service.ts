@@ -614,7 +614,7 @@ export function generateWidgetScript(): string {
                 var chatBubble = document.getElementById('ai-chat-bubble');
                 if (chatWin) chatWin.style.display = 'flex';
                 if (chatBubble) chatBubble.style.display = 'none';
-                if (typeof initializeChat === 'function') initializeChat(widgetConfig, apiUrl);
+                if (typeof initializeChat === 'function') initializeChat(cfg, apiUrl);
               } else if (action === 'open-url') {
                 var url = el.getAttribute('data-click-url');
                 if (url) window.open(url, '_blank');
@@ -686,10 +686,12 @@ export function generateWidgetScript(): string {
     
     // Close button
     const closeBtn = chatWindow.querySelector('#ai-chat-close');
-    closeBtn.addEventListener('click', () => {
-      chatWindow.style.display = 'none';
-      bubble.style.display = 'flex';
-    });
+    if (closeBtn) {
+      closeBtn.addEventListener('click', () => {
+        chatWindow.style.display = 'none';
+        bubble.style.display = 'flex';
+      });
+    }
     
     // Apply custom CSS
     if (cfg.customCss) {
@@ -936,9 +938,9 @@ function renderChatBlock(block, cfg, depth) {
       textsHtml += '</div>';
 
       const leftHtml = \`<div style="display: flex; align-items: center;">\${avatarHtml}\${textsHtml}</div>\`;
-      
-      const closeBtn = \`<button onclick="window.parent.postMessage({type: 'bonsai-widget-close'}, '*')" style="background: transparent; border: none; color: inherit; font-size: 20px; cursor: pointer; padding: 0; width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; transition: opacity 0.2s;">×</button>\`;
-      
+
+      const closeBtn = \`<button id="ai-chat-close" style="background: transparent; border: none; color: inherit; font-size: 20px; cursor: pointer; padding: 0; width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; transition: opacity 0.2s;">×</button>\`;
+
       content = \`<div id="\${blockId}"\${mobileHidden} style="\${headerStyle}">\${leftHtml}\${closeBtn}</div>\`;
       break;
 
@@ -1552,10 +1554,28 @@ function appendInlineMessage(content, isUser, cfg, sources) {
 }
 
 function initializeChat(cfg, apiUrl) {
+  // Wait for Socket.IO to load before proceeding
+  if (typeof io === 'undefined') {
+    console.log('AI Chat: Waiting for Socket.IO to load...');
+    var waitInterval = setInterval(function() {
+      if (typeof io !== 'undefined') {
+        clearInterval(waitInterval);
+        console.log('AI Chat: Socket.IO now available, initializing chat');
+        initializeChat(cfg, apiUrl);
+      }
+    }, 100);
+    return;
+  }
+
   const messagesContainer = document.getElementById('ai-chat-messages');
   const input = document.getElementById('ai-chat-input');
   const sendBtn = document.getElementById('ai-chat-send');
   const typingIndicator = document.getElementById('ai-chat-typing');
+
+  if (!messagesContainer || !input || !sendBtn) {
+    console.error('AI Chat: Required DOM elements not found');
+    return;
+  }
 
   // Initialize Socket.io
   if (!socket) {
@@ -1762,10 +1782,17 @@ function playNotificationSound() {
   audio.play().catch(() => { });
 }
 
-// Load Socket.io client
-const script = document.createElement('script');
-script.src = 'https://cdn.socket.io/4.6.1/socket.io.min.js';
-document.head.appendChild(script);
+// Load Socket.io client and wait for it before allowing chat init
+const socketScript = document.createElement('script');
+socketScript.src = 'https://cdn.socket.io/4.6.1/socket.io.min.js';
+socketScript.onload = function() {
+  console.log('AI Chat: Socket.IO loaded successfully');
+  window.__aiChatSocketReady = true;
+};
+socketScript.onerror = function() {
+  console.error('AI Chat: Failed to load Socket.IO');
+};
+document.head.appendChild(socketScript);
 })();
 `;
 }
