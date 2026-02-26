@@ -26,6 +26,7 @@ interface LauncherBlock {
     mobileHidden?: boolean;
     splitRatio?: number;
     statusType?: string;
+    hoverStyle?: Record<string, string>;
     animation?: { type: string; duration: number; delay: number; easing: string; trigger: string; repeat: number; };
 }
 
@@ -41,6 +42,7 @@ interface ChatBlock {
     mobileHidden?: boolean;
     splitRatio?: number;
     statusType?: string;
+    hoverStyle?: Record<string, string>;
     animation?: { type: string; duration: number; delay: number; easing: string; trigger: string; repeat: number; };
 }
 
@@ -55,14 +57,15 @@ function escapeHtml(str: string): string {
 }
 
 function styleObj(styles: Record<string, string | number | undefined>): string {
-    return Object.entries(styles)
-        .filter(([, v]) => v !== undefined && v !== null && v !== '')
+    const raw = (styles as any).__raw || '';
+    const parts = Object.entries(styles)
+        .filter(([k, v]) => k !== '__raw' && v !== undefined && v !== null && v !== '')
         .map(([k, v]) => {
-            // camelCase to kebab-case
             const prop = k.replace(/[A-Z]/g, m => '-' + m.toLowerCase());
             return `${prop}: ${v}`;
-        })
-        .join('; ');
+        });
+    if (raw) parts.push(raw);
+    return parts.join('; ');
 }
 
 /**
@@ -199,7 +202,11 @@ function renderLauncherBlock(block: LauncherBlock, depth: number = 0): string {
         clickAttrs = ` style="${baseStyles} ${userStyles}"`;
     }
 
-    return `<div id="${blockId}"${mobileHidden}${clickAttrs}>${content}</div>`;
+    // Hover CSS
+    const hoverCss = block.hoverStyle ? styleObj(block.hoverStyle as any) : '';
+    const hoverTag = hoverCss ? `<style>#${blockId}:hover { ${hoverCss} }</style>` : '';
+
+    return `${hoverTag}<div id="${blockId}"${mobileHidden}${clickAttrs}${animAttr}>${content}</div>`;
 }
 
 function renderSimpleLauncher(cfg: WidgetConfig): string {
@@ -312,7 +319,12 @@ function renderChatBlock(block: ChatBlock, cfg: WidgetConfig, depth: number = 0)
     if (!block || !block.id) return '';
 
     const blockId = 'chat-block-' + block.id;
+    const animAttr = block.animation && block.animation.type !== 'none'
+        ? ` data-gsap-anim='${JSON.stringify(block.animation)}'`
+        : '';
     const userStyles = block.style ? styleObj(block.style) : '';
+    const hoverCss = block.hoverStyle ? styleObj(block.hoverStyle as any) : '';
+    const hoverTag = hoverCss ? `<style>#${blockId}:hover { ${hoverCss} }</style>` : '';
     const mobileHidden = block.mobileHidden ? ' class="chat-mobile-hidden"' : '';
     const childrenHtml = (block.children || []).map(c => renderChatBlock(c, cfg, depth + 1)).join('');
 
@@ -461,7 +473,12 @@ function renderChatBlock(block: ChatBlock, cfg: WidgetConfig, depth: number = 0)
             break;
 
         default:
-            content = `<div id="${blockId}"${mobileHidden} style="${userStyles}">${childrenHtml}</div>`;
+            content = `<div id="${blockId}"${mobileHidden}${animAttr} style="${userStyles}">${childrenHtml}</div>`;
+    }
+
+    // Wrap with hover tag if needed
+    if (hoverTag && content) {
+        return hoverTag + content.replace(/<(div|button|img)\s+id="${blockId}"/, `<$1 id="${blockId}"${animAttr}`);
     }
 
     return content;
