@@ -577,7 +577,39 @@ router.get("/config/:installCode", async (req, res) => {
   }
 });
 
+// Widget render (PUBLIC - serves raw HTML to be injected by widget.js)
+import { renderWidgetHTML } from "../services/widget.renderer";
+router.get("/render/:installCode", async (req, res) => {
+  try {
+    const widget = await widgetService.getWidgetByInstallCode(req.params.installCode);
+    const html = renderWidgetHTML(widget);
+
+    // Explicit CORS headers since this is called from the client website
+    res.setHeader("Access-Control-Allow-Origin", "*");
+    res.setHeader("Content-Type", "text/html");
+    res.send(html);
+  } catch (error) {
+    if (error instanceof WidgetError) {
+      return res.status(error.statusCode).json({ error: error.message });
+    }
+    console.error("Widget render error:", error);
+    res.status(500).json({ error: "Failed to render widget" });
+  }
+});
+
 // Widget preview (authenticated - for testing widget appearance)
+router.post("/preview-html", requireAuth, async (req: AuthRequest, res) => {
+  try {
+    const config = req.body;
+    const html = renderWidgetHTML(config as any);
+    res.setHeader("Content-Type", "text/html");
+    res.send(html);
+  } catch (error) {
+    console.error("Widget preview render error:", error);
+    res.status(500).json({ error: "Failed to render preview" });
+  }
+});
+
 router.get("/preview/:id", requireAuth, async (req: AuthRequest, res) => {
   try {
     const { workspaceId } = req.query;

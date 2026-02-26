@@ -162,13 +162,14 @@ app.all("/api/auth/*", authLimiter, async (req, res) => {
 });
 
 // Serve widget.js (PUBLIC) with explicit CORS headers
+import { generateWidgetLoader } from "./services/widget.loader";
 app.get("/widget.js", (req, res) => {
   // Explicit CORS headers for widget to work on ANY website
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "GET, OPTIONS");
   res.setHeader("Cross-Origin-Resource-Policy", "cross-origin");
   res.setHeader("Content-Type", "application/javascript");
-  res.send(generateWidgetScript());
+  res.send(generateWidgetLoader());
 });
 
 // API routes - BASIC ONLY FOR NOW
