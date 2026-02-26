@@ -1,12 +1,14 @@
 import { prisma } from "../lib/prisma";
 import { nanoid } from "nanoid";
-import OpenAI from "openai";
 import socketService from "./socket.service";
 import * as webhookService from "./webhook.service";
 import * as workflowExecutor from "./workflowExecutor.service";
 import * as presenceService from "./presence.service";
 import logger from '../lib/logger';
 import { StartConversationInput, SendMessageInput } from '../routes/chat.routes';
+import { generateChatCompletion } from '../lib/openai';
+import { truncateMessages, getModelTokenLimit } from '../lib/tokenCounter';
+import { defaultDutchDirectives } from '../lib/prompts';
 
 export class ChatError extends Error {
   constructor(
@@ -17,10 +19,6 @@ export class ChatError extends Error {
     this.name = "ChatError";
   }
 }
-
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
 
 
 export async function startConversation(input: StartConversationInput) {
@@ -193,8 +191,8 @@ export async function sendMessage(input: SendMessageInput) {
         },
       },
       messages: {
-        orderBy: { createdAt: "asc" },
-        take: 20, // Last 20 messages for context
+        orderBy: { createdAt: "desc" },
+        take: 30, // Last 30 messages for context
       },
       assignedTo: true,
     },
@@ -203,6 +201,9 @@ export async function sendMessage(input: SendMessageInput) {
   if (!conversation) {
     throw new ChatError("Conversation not found", 404);
   }
+
+  // Reverse messages to get them in chronological order
+  conversation.messages = conversation.messages.reverse();
 
   // If message is from an AGENT (human agent via dashboard), check if they are assigned
   if (input.role === "AGENT") {
@@ -229,7 +230,7 @@ export async function sendMessage(input: SendMessageInput) {
 
   // Debug: Log URL storage
   if (input.currentPageUrl) {
-    console.log('🌐 Stored currentPageUrl:', input.currentPageUrl, 'for conversation:', conversation.id);
+    logger.info('🌐 Stored currentPageUrl', { currentPageUrl: input.currentPageUrl, conversationId: conversation.id });
   }
 
   // Broadcast message via Socket.io
@@ -450,11 +451,35 @@ async function generateAIResponse(conversation: any, userMessage: string, curren
       try {
         const context = await getPageContext(currentPageUrl, agent.knowledgeBaseId);
         if (context) {
-          pageContext = `\n\nContext from current page (${currentPageUrl}):\n${context.content}\n`;
+          pageContext = `\n\n<page_context>\nCurrent page url: ${currentPageUrl}\n\n${context.content}\n</page_context>\n`;
           pageSources = context.sources;
+        } else {
+          // Fallback to KB search if no page context is available for this URL
+          try {
+            const urlParts = new URL(currentPageUrl).pathname.split('/').filter(Boolean);
+            if (urlParts.length > 0) {
+              const fallbackQuery = urlParts.join(' ');
+              const { searchKnowledgeBase } = await import("./knowledgeBase.service");
+              const fallbackResults = await searchKnowledgeBase(agent.knowledgeBaseId, fallbackQuery, 3);
+              if (fallbackResults.length > 0) {
+                const fallbackContent = fallbackResults.map(r => r.content).join("\n\n");
+                pageContext = `\n\n<page_context>\n${fallbackContent}\n</page_context>\n`;
+                pageSources = fallbackResults.map((r, i) => ({
+                  id: i + 1,
+                  content: r.content.substring(0, 200),
+                  documentTitle: r.documentTitle,
+                  sourceUrl: r.sourceUrl,
+                  score: r.score,
+                }));
+              }
+            }
+          } catch (urlSearchError) {
+            // Log but don't fail if the fallback fails
+            logger.warn("URL fallback search failed", { error: urlSearchError });
+          }
         }
-      } catch (error) {
-        console.error("Page context error:", error);
+      } catch (error: any) {
+        logger.error("Page context error", { error: error.message });
       }
     }
 
@@ -462,15 +487,46 @@ async function generateAIResponse(conversation: any, userMessage: string, curren
     let kbContext = "";
     let kbSources: any[] = [];
 
+    // --- Query Reformulation for Context-Aware RAG ---
+    let searchTargetQuery = userMessage;
+
+    // Only reformulate if we have previous conversation history to contextualize
+    if (conversation.messages && conversation.messages.length > 0) {
+      // Build a minimal history array for the LLM
+      const recentHistory = conversation.messages.slice(-5).map((m: any) => `${m.role === 'USER' ? 'User' : 'Assistant'}: ${m.content}`).join('\n');
+
+      const reformulationPrompt = `Given the following conversation history and the latest user query, rewrite the user query into a standalone, comprehensive question that captures all context needed for a knowledge base search. If the latest query is already standalone, return it exactly as is (no preamble, no quotes).\n\nHistory:\n${recentHistory}\n\nLatest Query: ${userMessage}\n\nStandalone Query:`;
+
+      try {
+        const reformulateResult = await generateChatCompletion(
+          [
+            { role: "system", content: "You are an expert search engineer. Rewrite user queries into standalone search terms based on context." },
+            { role: "user", content: reformulationPrompt }
+          ],
+          "gpt-4o-mini",
+          { max_tokens: 100, temperature: 0 }
+        );
+
+        const generatedQuery = reformulateResult.choices?.[0]?.message?.content?.trim();
+        if (generatedQuery && generatedQuery !== "") {
+          searchTargetQuery = generatedQuery;
+          logger.info("Query reformulated for RAG", { original: userMessage, reformulated: searchTargetQuery, conversationId: conversation.id });
+        }
+      } catch (refError) {
+        logger.warn("Query reformulation failed, falling back to original verbatim", { error: refError });
+      }
+    }
+
+
     if (agent.knowledgeBaseId) {
       const { searchKnowledgeBase } = await import("./knowledgeBase.service");
       try {
         // INCREASED LIMIT for "Super System" - extensive context retrieval
-        const results = await searchKnowledgeBase(agent.knowledgeBaseId, userMessage, 10);
+        const results = await searchKnowledgeBase(agent.knowledgeBaseId, searchTargetQuery, 10);
         if (results.length > 0) {
-          kbContext = "\n\n=== RELEVANT KNOWLEDGE BASE INFORMATION ===\n" +
+          kbContext = "\n\n<knowledge_base_context>\n" +
             results.map((r, i) => `[Source ${i + 1}] (Title: ${r.documentTitle}): ${r.content}`).join("\n\n") +
-            "\n===========================================\n";
+            "\n</knowledge_base_context>\n";
 
           // Extract sources with URLs
           kbSources = results.map((r, i) => ({
@@ -481,245 +537,44 @@ async function generateAIResponse(conversation: any, userMessage: string, curren
             score: r.score,
           }));
         }
-      } catch (error) {
-        console.error("KB search error:", error);
+      } catch (error: any) {
+        logger.error("KB search error", { error: error.message });
       }
     }
 
-    // Build conversation history with page and KB context
-    // COMPREHENSIVE AI DIRECTIVES - v4 (Extended Quality Instructions)
-    const additionalDirectives =
-      "\n\n" +
-      "╔══════════════════════════════════════════════════════════════════════════════════════════════╗\n" +
-      "║                           UITGEBREIDE INSTRUCTIES VOOR AI ASSISTENT                         ║\n" +
-      "║                              (Volg deze regels STRIKT)                                       ║\n" +
-      "╚══════════════════════════════════════════════════════════════════════════════════════════════╝\n\n" +
+    // Use default Dutch directives if none exist on the agent (or just append)
+    const directivesToUse = defaultDutchDirectives;
+    const systemPrompt = agent.systemPrompt + pageContext + kbContext + directivesToUse;
 
-      // ==================== SECTIE 1: KOSTEN/PRIJZEN ====================
-      "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n" +
-      "█ SECTIE 1: VRAGEN OVER KOSTEN/PRIJZEN - SPECIALE BEHANDELING\n" +
-      "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n" +
-      "Wanneer de gebruiker vraagt over kosten, prijzen, of betaling:\n" +
-      "   'wat kost dit?', 'hoeveel kost?', 'zijn de producten gratis?', 'moet ik betalen?',\n" +
-      "   'is er een prijs?', 'wat zijn de tarieven?', 'is het betaald?'\n\n" +
-      "Dan moet je EERST EN DIRECT beantwoorden:\n" +
-      "   → Zoek in de knowledge base of producten GRATIS zijn of niet.\n" +
-      "   → Als ze GRATIS zijn, zeg dit ONMIDDELLIJK als eerste zin!\n" +
-      "   → Voorbeeld: \"De producten/materialen zijn gratis voor bedrijven en scholen.\"\n" +
-      "   → Pas DAARNA kun je eventueel indicatieve waardes noemen.\n" +
-      "   → NOOIT zeggen 'ik kan geen prijzen geven' als het antwoord GRATIS is!\n" +
-      "   → NOOIT ontwijkend antwoorden over prijzen als je weet dat het gratis is.\n\n" +
-
-      // ==================== SECTIE 2: FEITELIJKE NAUWKEURIGHEID ====================
-      "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n" +
-      "█ SECTIE 2: FEITELIJKE NAUWKEURIGHEID (HOOGSTE PRIORITEIT)\n" +
-      "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n" +
-      "Je bent een support assistent met toegang tot de 'Relevant Knowledge Base Information' hierboven.\n\n" +
-      "GOUDEN REGELS:\n" +
-      "   ✓ Je moet informatie gebruiken die in de knowledge base staat.\n" +
-      "   ✓ GEEN interpretaties, aannames, of afleidingen - alleen exacte feiten.\n" +
-      "   ✓ Verzin NOOIT informatie die niet in de knowledge base staat.\n" +
-      "   ✓ Gebruik je eigen kennis NIET om gaten te vullen over dit specifieke bedrijf.\n\n" +
-      "ALS INFORMATIE NIET GEVONDEN WORDT:\n" +
-      "   ✓ Geef een BEHULPZAME fallback, geen koude afwijzing!\n" +
-      "   ✓ Verwijs naar de website voor meer informatie\n" +
-      "   ✓ Bied aan om te helpen met een andere vraag\n" +
-      "   ❌ FOUT: \"Dat kan ik niet vinden in de beschikbare informatie.\"\n" +
-      "   ❌ FOUT: \"Ik heb geen informatie hierover.\"\n" +
-      "   ✅ GOED: \"Die specifieke info heb ik niet direct paraat, maar je kunt dit vinden op de website. Kan ik je ergens anders mee helpen?\"\n" +
-      "   ✅ GOED: \"Voor meer details hierover kun je het beste de 'Over Ons' pagina op de website bekijken. Heb je nog andere vragen?\"\n\n" +
-
-      // ==================== SECTIE 3: TERMINOLOGIE ====================
-      "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n" +
-      "█ SECTIE 3: TERMINOLOGIE - KRITIEK (GEEN FOUTEN TOEGESTAAN)\n" +
-      "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n" +
-      "Dit zijn VERSCHILLENDE concepten die je NOOIT mag verwarren:\n\n" +
-      "   ┌─────────────────────────────────────────────────────────────────┐\n" +
-      "   │  ❌ FOUT TAALGEBRUIK:                                          │\n" +
-      "   │     'prijs', 'kost', 'kosten', 'betalen', 'tarief'             │\n" +
-      "   │     (tenzij producten daadwerkelijk NIET gratis zijn)          │\n" +
-      "   │                                                                 │\n" +
-      "   │  ✅ CORRECT TAALGEBRUIK:                                       │\n" +
-      "   │     'waarde', 'indicatieve waarde', 'geschatte waarde',        │\n" +
-      "   │     'marktwaarde', 'gratis', 'kosteloos'                       │\n" +
-      "   └─────────────────────────────────────────────────────────────────┘\n\n" +
-      "DEFINITIES:\n" +
-      "   • 'WAARDE' = Wat iets waard is op de markt. Dit is GEEN verkoopprijs.\n" +
-      "   • 'PRIJS' = Wat je moet betalen. Dit concept bestaat mogelijk NIET voor dit bedrijf.\n" +
-      "   • 'GRATIS' = Je hoeft NIET te betalen. Dit is het antwoord op 'wat kost dit?'\n\n" +
-      "VOORBEELDEN:\n" +
-      "   ❌ FOUT: \"Het product kost €54\"\n" +
-      "   ❌ FOUT: \"De prijs is €54\"\n" +
-      "   ❌ FOUT: \"Je betaalt €54\"\n" +
-      "   ✅ GOED: \"Het product is gratis. De indicatieve waarde is €54.\"\n" +
-      "   ✅ GOED: \"De materialen zijn gratis beschikbaar voor bedrijven en scholen.\"\n\n" +
-
-      // ==================== SECTIE 4: DIRECTE ANTWOORDEN ====================
-      "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n" +
-      "█ SECTIE 4: DIRECTE ANTWOORDEN - NIET ONTWIJKEN\n" +
-      "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n" +
-      "Beantwoord ELKE vraag DIRECT. Geen omwegen, geen ontwijkende antwoorden.\n\n" +
-      "   ❌ FOUT: \"Ik kan geen specifieke prijzen geven, maar de waarde varieert...\"\n" +
-      "   ❌ FOUT: \"Dat hangt af van verschillende factoren...\"\n" +
-      "   ❌ FOUT: \"Ik zou u aanraden om contact op te nemen voor meer informatie...\"\n" +
-      "   ✅ GOED: \"De producten zijn gratis voor bedrijven en scholen.\"\n" +
-      "   ✅ GOED: \"Ja, dit product is beschikbaar. De indicatieve waarde is €X.\"\n" +
-      "   ✅ GOED: \"Nee, dit is alleen voor bedrijven, niet voor particulieren.\"\n\n" +
-      "BELANGRIJK: Als iets gratis is, zeg dat EERST voordat je over waardes praat.\n\n" +
-
-      // ==================== SECTIE 5: TOON EN PERSOONLIJKHEID ====================
-      "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n" +
-      "█ SECTIE 5: TOON EN PERSOONLIJKHEID\n" +
-      "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n" +
-      "Wees:\n" +
-      "   ✓ VRIENDELIJK - Warm en toegankelijk, niet robotachtig\n" +
-      "   ✓ BEHULPZAAM - Proactief oplossingen bieden\n" +
-      "   ✓ PROFESSIONEEL - Betrouwbaar en kundig overkomen\n" +
-      "   ✓ BEKNOPT - Niet langdradig, to-the-point\n" +
-      "   ✓ POSITIEF - Gebruik positief taalgebruik waar mogelijk\n" +
-      "   ✓ ENTHOUSIAST - Laat zien dat je graag helpt\n\n" +
-      "Vermijd:\n" +
-      "   ✗ Overdreven formeel taalgebruik\n" +
-      "   ✗ Robotachtige, stijve antwoorden\n" +
-      "   ✗ Lange, omslachtige zinnen\n" +
-      "   ✗ Negatief taalgebruik (\"helaas\", \"jammer genoeg\", \"niet mogelijk\")\n" +
-      "   ✗ Twijfelend taalgebruik (\"misschien\", \"ik denk\", \"waarschijnlijk\")\n\n" +
-
-      // ==================== SECTIE 6: FORMATTING ====================
-      "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n" +
-      "█ SECTIE 6: FORMATTING EN STRUCTUUR\n" +
-      "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n" +
-      "ALGEMEEN:\n" +
-      "   • Houd antwoorden kort en bondig (max 2-3 paragrafen voor simpele vragen)\n" +
-      "   • Gebruik bullet points voor lijsten met 3+ items\n" +
-      "   • Gebruik nummering voor stappen of procedures\n" +
-      "   • Zet belangrijke informatie EERST\n\n" +
-      "BIJ PRODUCTLIJSTEN:\n" +
-      "   • Presenteer producten in een duidelijke lijst\n" +
-      "   • Vermeld naam, beschikbaarheid, en waarde (indien relevant)\n" +
-      "   • Groepeer gerelateerde producten\n\n" +
-      "BIJ PROCEDURES:\n" +
-      "   1. Gebruik genummerde stappen\n" +
-      "   2. Houd elke stap kort\n" +
-      "   3. Voeg relevante details toe per stap\n\n" +
-
-      // ==================== SECTIE 7: FACT-CHECK PROTOCOL ====================
-      "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n" +
-      "█ SECTIE 7: FACT-CHECK PROTOCOL (VOOR ELKE RESPONSE)\n" +
-      "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n" +
-      "Voordat je antwoordt, doorloop deze checklist MENTAAL:\n\n" +
-      "   □ Staat dit LETTERLIJK in de knowledge base?\n" +
-      "   □ Beantwoord ik de vraag DIRECT? (niet ontwijkend)\n" +
-      "   □ Als producten gratis zijn, zeg ik dit EERST?\n" +
-      "   □ Gebruik ik de juiste terminologie? (waarde ≠ prijs)\n" +
-      "   □ Spreek ik mezelf niet TEGEN in hetzelfde antwoord?\n" +
-      "   □ Is mijn antwoord BEKNOPT maar COMPLEET?\n" +
-      "   □ Klinkt mijn antwoord VRIENDELIJK en PROFESSIONEEL?\n" +
-      "   □ Verzin ik geen informatie?\n\n" +
-
-      // ==================== SECTIE 8: VEELGESTELDE VRAGEN ====================
-      "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n" +
-      "█ SECTIE 8: VEELGESTELDE VRAGEN - STANDAARD ANTWOORDEN\n" +
-      "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n" +
-      "Bij deze vragen, gebruik de knowledge base maar volg dit patroon:\n\n" +
-      "\"Wat kosten de producten?\" / \"Is dit gratis?\"\n" +
-      "   → Check knowledge base voor gratis/betaald info\n" +
-      "   → Antwoord EERST of het gratis is of niet\n" +
-      "   → Voeg eventueel voorwaarden toe (voor bedrijven, scholen, etc.)\n\n" +
-
-      "\"Wat is jullie missie?\" / \"Wat is jullie doel?\" / \"Waar staan jullie voor?\"\n" +
-      "   → Dit is een belangrijke vraag! Check de knowledge base grondig.\n" +
-      "   → Zoek naar termen als: missie, doel, visie, kernwaarden, waar we voor staan, onze belofte\n" +
-      "   → Als informatie gevonden: geef een enthousiast en samenvattend antwoord\n" +
-      "   → Als NIET gevonden: geef een behulpzame fallback:\n" +
-      "     ✅ GOED: \"De volledige missie en visie kun je vinden op onze 'Over Ons' pagina. Wil je dat ik je help met een andere vraag?\"\n" +
-      "     ❌ FOUT: \"Dat kan ik niet vinden in de beschikbare informatie.\"\n\n" +
-
-      "\"Wie zijn jullie?\" / \"Vertel over jullie bedrijf\" / \"Over jullie\"\n" +
-      "   → Geef een korte introductie van het bedrijf als beschikbaar\n" +
-      "   → Noem kernactiviteiten en doelgroep\n" +
-      "   → Als niet in KB: \"Meer over ons vind je op de 'Over Ons' pagina van onze website!\"\n\n" +
-
-      "\"Zijn jullie open?\" / \"Wat zijn de openingstijden?\"\n" +
-      "   → Geef directe openingstijden uit knowledge base\n" +
-      "   → Noem bijzonderheden (feestdagen, etc.)\n\n" +
-      "\"Waar zijn jullie gevestigd?\" / \"Adres?\"\n" +
-      "   → Geef volledig adres\n" +
-      "   → Voeg eventueel routebeschrijving toe indien beschikbaar\n\n" +
-      "\"Hoe kan ik contact opnemen?\"\n" +
-      "   → Geef alle contactmogelijkheden (telefoon, email, WhatsApp, etc.)\n\n" +
-      "\"Kan ik als particulier ook terecht?\"\n" +
-      "   → Check knowledge base voor doelgroep\n" +
-      "   → Wees eerlijk als het alleen voor bedrijven/scholen is\n\n" +
-
-      // ==================== SECTIE 9: CONTEXT-BEWUST ANTWOORDEN ====================
-      "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n" +
-      "█ SECTIE 9: CONTEXT-BEWUST ANTWOORDEN\n" +
-      "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n" +
-      "Let op de CONTEXT van het gesprek:\n\n" +
-      "   • Als de gebruiker al een vraag heeft gesteld, verwijs niet onnodig terug\n" +
-      "   • Als je eerder informatie hebt gegeven, herhaal niet alles\n" +
-      "   • Bouw voort op eerdere berichten in het gesprek\n" +
-      "   • Als de vraag onduidelijk is, vraag om verduidelijking\n" +
-      "   • Onthoud wat de gebruiker eerder heeft gezegd\n\n" +
-      "PAGINA CONTEXT:\n" +
-      "   • Als je weet op welke pagina de gebruiker is, gebruik die context\n" +
-      "   • Geef relevante informatie voor die specifieke pagina\n\n" +
-
-      // ==================== SECTIE 10: ESCALATIE ====================
-      "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n" +
-      "█ SECTIE 10: ESCALATIE EN DOORVERWIJZING\n" +
-      "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n" +
-      "Verwijs naar een medewerker wanneer:\n" +
-      "   • De gebruiker expliciet om een mens vraagt\n" +
-      "   • Je het antwoord echt niet kunt vinden in de knowledge base\n" +
-      "   • Er sprake is van een klacht of conflict\n" +
-      "   • De vraag te complex of specifiek is\n\n" +
-      "HOE te verwijzen:\n" +
-      "   ✅ GOED: \"Voor deze specifieke vraag kan een medewerker je beter helpen. Zal ik je doorverbinden?\"\n" +
-      "   ❌ FOUT: \"Ik weet het niet, bel maar naar het bedrijf.\"\n\n" +
-
-      // ==================== SECTIE 11: VERBODEN HANDELINGEN ====================
-      "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n" +
-      "█ SECTIE 11: VERBODEN HANDELINGEN\n" +
-      "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n" +
-      "NOOIT DOEN:\n" +
-      "   ✗ Informatie verzinnen of hallucineren\n" +
-      "   ✗ Prijzen noemen als producten gratis zijn\n" +
-      "   ✗ Waarde verwarren met prijs\n" +
-      "   ✗ Citaties gebruiken zoals '[Source 1]' (wordt automatisch getoond)\n" +
-      "   ✗ Jezelf tegenspreken in één antwoord\n" +
-      "   ✗ Ontwijkende of vage antwoorden geven\n" +
-      "   ✗ Over concurrenten praten (tenzij expliciet toegestaan)\n" +
-      "   ✗ Juridisch, medisch, of financieel advies geven\n" +
-      "   ✗ Persoonlijke meningen als feiten presenteren\n" +
-      "   ✗ Externe kennnis gebruiken over dit specifieke bedrijf\n\n" +
-
-      // ==================== SECTIE 12: RESPONSE REGELS ====================
-      "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n" +
-      "█ SECTIE 12: ALGEMENE RESPONSE REGELS\n" +
-      "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n" +
-      "• Antwoord in de taal van de gebruiker (Nederlands of Engels)\n" +
-      "• Gebruik GEEN citaties - bronnen worden automatisch getoond\n" +
-      "• Wees behulpzaam, professioneel en DIRECT\n" +
-      "• Als er geen relevante informatie is, verzin NIETS\n" +
-      "• Begin met het belangrijkste antwoord, details daarna\n" +
-      "• Sluit af met een vraag of aanbieding om verder te helpen indien gepast\n" +
-      "• Gebruik emoji's spaarzaam en alleen als het past bij de toon\n\n" +
-
-      "══════════════════════════════════════════════════════════════════════════════\n\n";
-
-    const systemPrompt = agent.systemPrompt + pageContext + kbContext + additionalDirectives;
-
-    const messages: any[] = [
+    let messages: any[] = [
       {
         role: "system",
         content: systemPrompt,
       },
     ];
 
+    // Check for conversation summary in state
+    const summary = (conversation.state as any)?.summary as string | undefined;
+    const lastSummarizedMessageId = (conversation.state as any)?.lastSummarizedMessageId as string | undefined;
+    let messagesToInclude = conversation.messages;
+
+    if (summary) {
+      messages.push({
+        role: "system",
+        content: `PREVIOUS CONVERSATION SUMMARY: \n${summary}\n\nUse this context for the following messages.`
+      });
+
+      // If we have a lastSummarizedMessageId, only include messages after it
+      if (lastSummarizedMessageId) {
+        const summarizeIndex = conversation.messages.findIndex((m: any) => m.id === lastSummarizedMessageId);
+        if (summarizeIndex >= 0) {
+          messagesToInclude = conversation.messages.slice(summarizeIndex + 1);
+        }
+      }
+    }
+
     // Add conversation history
-    conversation.messages.forEach((msg: any) => {
+    messagesToInclude.forEach((msg: any) => {
       if (msg.role === "USER") {
         messages.push({ role: "user", content: msg.content });
       } else if (msg.role === "ASSISTANT") {
@@ -730,29 +585,93 @@ async function generateAIResponse(conversation: any, userMessage: string, curren
     // Add current message
     messages.push({ role: "user", content: userMessage });
 
-    // Call OpenAI (or other LLM based on agent.aiModel)
-    const response = await openai.chat.completions.create({
-      model: agent.aiModel,
-      messages,
-      temperature: agent.temperature,
-      max_tokens: agent.maxTokens,
+    // Truncate messages if they exceed token limit
+    const modelLimit = getModelTokenLimit(agent.aiModel);
+    const reserveForResponse = agent.maxTokens || 1000;
+    messages = truncateMessages(messages, {
+      maxTokens: modelLimit - reserveForResponse,
+      systemMessage: messages[0],
+      preserveRecent: 10,
     });
 
-    const aiResponse = response.choices[0].message.content || agent.fallbackMessage || "I'm sorry, I couldn't generate a response.";
-    const tokens = response.usage?.total_tokens || 0;
+    // Call OpenAI with streaming enabled
+    const stream = await generateChatCompletion(
+      messages,
+      agent.aiModel,
+      {
+        temperature: agent.temperature,
+        max_tokens: agent.maxTokens,
+        stream: true,
+      }
+    ) as any; // Cast as any because stream returns AsyncIterable for chunks
+
+    let fullResponse = "";
+    const messageId = nanoid(); // Generate a temporary ID for the streaming message
+
+    // Broadcast initial message start
+    socketService.getIO()?.to(`conversation:${conversation.id}`).emit('ai:stream:start', {
+      id: messageId,
+      conversationId: conversation.id,
+      role: 'ASSISTANT',
+      timestamp: new Date()
+    });
+
+    try {
+      for await (const chunk of stream) {
+        const content = chunk.choices[0]?.delta?.content || "";
+        if (content) {
+          fullResponse += content;
+          // Emit chunk to client
+          socketService.getIO()?.to(`conversation:${conversation.id}`).emit('ai:stream:chunk', {
+            id: messageId,
+            conversationId: conversation.id,
+            content: content
+          });
+        }
+      }
+    } catch (streamError) {
+      logger.error("Streaming error", { error: streamError });
+      // If we got nothing, fallback
+      if (!fullResponse) {
+        throw streamError;
+      }
+    }
+
+    // Notify streaming complete
+    socketService.getIO()?.to(`conversation:${conversation.id}`).emit('ai:stream:end', {
+      id: messageId,
+      conversationId: conversation.id,
+    });
+
+    const isFallback = !fullResponse;
+    const aiResponse = fullResponse || agent.fallbackMessage || "I'm sorry, I couldn't generate a response.";
+
+    // Estimate tokens
+    const promptTokens = Math.floor(systemPrompt.length / 4) + messages.reduce((acc, m) => acc + (m.content?.length || 0) / 4, 0);
+    const completionTokens = Math.floor(aiResponse.length / 4);
+    const tokens = promptTokens + completionTokens;
     const latency = Date.now() - startTime;
+
+    // Background task: Summarize conversation if it's getting long
+    if (conversation.messages && conversation.messages.length >= 20) {
+      // Run in background so it doesn't block the response
+      summarizeConversation(conversation.id).catch(err => {
+        logger.error("Failed to summarize conversation", { error: err.message });
+      });
+    }
 
     // Save AI message with sources
     const aiMessage = await prisma.message.create({
       data: {
+        id: messageId, // Use the same ID we streamed with so frontend can replace it
         conversationId: conversation.id,
         role: "ASSISTANT",
         content: aiResponse,
         metadata: {
           model: agent.aiModel,
-          finishReason: response.choices[0].finish_reason,
           sources: [...pageSources, ...kbSources],
           currentPageUrl,
+          source: isFallback ? "fallback" : "ai_generated",
         },
         tokens,
         latency,
@@ -761,7 +680,7 @@ async function generateAIResponse(conversation: any, userMessage: string, curren
 
     return aiMessage;
   } catch (error: any) {
-    console.error("AI response error:", error);
+    logger.error("AI response error", { error: error.message });
 
     // Save fallback message
     return prisma.message.create({
@@ -771,10 +690,79 @@ async function generateAIResponse(conversation: any, userMessage: string, curren
         content: agent.fallbackMessage || "I'm experiencing technical difficulties. Please try again.",
         metadata: {
           error: error.message,
+          source: "fallback",
         },
         latency: Date.now() - startTime,
       },
     });
+  }
+}
+
+/**
+ * Summarizes the conversation to compress history and save tokens
+ * Runs asynchronously in the background
+ */
+async function summarizeConversation(conversationId: string) {
+  try {
+    const conversation = await prisma.conversation.findUnique({
+      where: { id: conversationId },
+      include: {
+        agent: true,
+        messages: {
+          orderBy: { createdAt: "asc" },
+        },
+      }
+    });
+
+    if (!conversation || !conversation.agent || conversation.messages.length < 20) return;
+
+    // We only summarize up to the last 10 messages (leave recent context intact)
+    const messagesToSummarize = conversation.messages.slice(0, conversation.messages.length - 10);
+    if (messagesToSummarize.length < 5) return; // Not enough to summarize
+
+    const previousSummary = ((conversation.state as any)?.summary as string) || "";
+
+    // Format the history to summarize
+    const formattedHistory = messagesToSummarize
+      .map(m => `${m.role === 'USER' ? 'User' : 'Assistant'}: ${m.content}`)
+      .join('\n\n');
+
+    let summaryPrompt = `Please summarize the following conversation history concisely, keeping all important facts, customer details, constraints, and the core intent of the user. Focus on information that will be relevant for answering future questions. Output ONLY the summary.\n\n`;
+
+    if (previousSummary) {
+      summaryPrompt += `PREVIOUS SUMMARY:\n${previousSummary}\n\n`;
+      summaryPrompt += `NEW MESSAGES TO ADD TO SUMMARY:\n${formattedHistory}`;
+    } else {
+      summaryPrompt += `CONVERSATION TO SUMMARIZE:\n${formattedHistory}`;
+    }
+
+    const response = await generateChatCompletion([
+      { role: "system", content: "You are an AI assistant specialized in heavily summarizing conversation histories into dense, factual context blobs." },
+      { role: "user", content: summaryPrompt }
+    ], "gpt-4o-mini", { temperature: 0.1, max_tokens: 500 });
+
+    const newSummary = response.choices?.[0]?.message?.content?.trim();
+    if (!newSummary) return;
+
+    // Update the conversation state with the new summary
+    const currentState = (conversation.state as any) || {};
+    await prisma.conversation.update({
+      where: { id: conversation.id },
+      data: {
+        state: {
+          ...currentState,
+          summary: newSummary,
+          lastSummarizedMessageId: messagesToSummarize[messagesToSummarize.length - 1].id
+        }
+      }
+    });
+
+    logger.info("Conversation summarized successfully", {
+      conversationId: conversation.id,
+      messagesSummarized: messagesToSummarize.length
+    });
+  } catch (error: any) {
+    logger.error("Failed to summarize conversation", { error: error.message, conversationId });
   }
 }
 
@@ -975,7 +963,7 @@ export async function getWorkspaceConversations(
         const metadata = message.metadata as any;
         if (metadata.currentPageUrl) {
           currentPageUrl = metadata.currentPageUrl;
-          console.log('🔍 Found URL for conversation', conv.id, ':', currentPageUrl);
+          logger.info('🔍 Found URL for conversation', { conversationId: conv.id, currentPageUrl });
           break; // Found the most recent URL, stop looking
         }
       }

@@ -1,5 +1,10 @@
 import { prisma } from "../lib/prisma";
-import OpenAI from "openai";
+import logger from "../lib/logger";
+import { openai } from "../lib/openai";
+import crypto from 'crypto';
+import pdfParse from 'pdf-parse';
+import mammoth from 'mammoth';
+import { Cache } from "../lib/redis";
 import { CreateKnowledgeBaseInput, CreateDocumentInput } from '../routes/knowledgeBase.routes';
 
 export class KnowledgeBaseError extends Error {
@@ -11,10 +16,6 @@ export class KnowledgeBaseError extends Error {
     this.name = "KnowledgeBaseError";
   }
 }
-
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
 
 
 export async function createKnowledgeBase(input: CreateKnowledgeBaseInput) {
@@ -166,7 +167,7 @@ export async function createDocument(input: CreateDocumentInput) {
 
   // Process document asynchronously
   processDocument(document.id, kb.chunkSize, kb.chunkOverlap, kb.embeddingModel).catch((error) => {
-    console.error("Document processing error:", error);
+    logger.error("Document processing error", { error: error.message });
     prisma.document.update({
       where: { id: document.id },
       data: {
@@ -192,35 +193,87 @@ export async function processDocument(
   if (!document) return;
 
   try {
+    let parsedContent = document.content;
+
+    // Check if we need to parse a file
+    if (document.fileUrl) {
+      try {
+        const response = await fetch(document.fileUrl);
+        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+
+        const arrayBuffer = await response.arrayBuffer();
+        const buffer = Buffer.from(arrayBuffer);
+
+        const mimeType = document.mimeType || '';
+        const fileUrlLower = document.fileUrl.toLowerCase();
+
+        if (mimeType.includes("pdf") || fileUrlLower.endsWith('.pdf')) {
+          const pdfData = await (pdfParse as any)(buffer);
+          parsedContent = pdfData.text;
+        } else if (
+          mimeType.includes("msword") ||
+          mimeType.includes("wordprocessingml") ||
+          fileUrlLower.endsWith('.docx') ||
+          fileUrlLower.endsWith('.doc')
+        ) {
+          const result = await mammoth.extractRawText({ buffer });
+          parsedContent = result.value;
+        }
+
+        // Update document with parsed content
+        if (parsedContent !== document.content) {
+          await prisma.document.update({
+            where: { id: document.id },
+            data: { content: parsedContent }
+          });
+        }
+      } catch (parseError: any) {
+        logger.error("Error parsing document file via URL", { error: parseError.message, documentId });
+        // Fallback to existing content or empty
+        parsedContent = document.content || "";
+      }
+    }
+
     // Split content into chunks
-    const chunks = splitTextIntoChunks(document.content, chunkSize, chunkOverlap);
+    const chunks = splitTextIntoChunks(parsedContent, chunkSize, chunkOverlap);
 
-    // Generate embeddings and save chunks one by one
-    // We can't use createMany because pgvector doesn't support it
-    for (let index = 0; index < chunks.length; index++) {
-      const chunk = chunks[index];
-      const embedding = await generateEmbedding(chunk.text, embeddingModel);
+    // Generate batched embeddings
+    const batchSize = 100;
+    for (let i = 0; i < chunks.length; i += batchSize) {
+      const batch = chunks.slice(i, i + batchSize);
 
-      // Convert embedding array to pgvector string format: '[0.1, 0.2, ...]'
-      const vectorString = `[${embedding.join(',')}]`;
+      const response = await openai.embeddings.create({
+        model: embeddingModel,
+        input: batch.map(c => c.text),
+      });
 
-      // Insert with raw SQL to use pgvector
-      await prisma.$executeRaw`
-        INSERT INTO "document_chunks" (
-          "id", "documentId", "content", "embedding", 
-          "chunkIndex", "startChar", "endChar", "metadata", "createdAt"
-        ) VALUES (
-          gen_random_uuid()::text,
-          ${document.id},
-          ${chunk.text},
-          ${vectorString}::vector(1536),
-          ${index},
-          ${chunk.startChar},
-          ${chunk.endChar},
-          ${JSON.stringify({ chunkLength: chunk.text.length })}::jsonb,
-          NOW()
-        )
-      `;
+      // Save chunks one by one
+      for (let j = 0; j < batch.length; j++) {
+        const chunk = batch[j];
+        const embedding = response.data[j].embedding;
+        const globalIndex = i + j;
+
+        // Convert embedding array to pgvector string format: '[0.1, 0.2, ...]'
+        const vectorString = `[${embedding.join(',')}]`;
+
+        // Insert with raw SQL to use pgvector
+        await prisma.$executeRaw`
+          INSERT INTO "document_chunks" (
+            "id", "documentId", "content", "embedding", 
+            "chunkIndex", "startChar", "endChar", "metadata", "createdAt"
+          ) VALUES (
+            gen_random_uuid()::text,
+            ${document.id},
+            ${chunk.text},
+            ${vectorString}::vector(1536),
+            ${globalIndex},
+            ${chunk.startChar},
+            ${chunk.endChar},
+            ${JSON.stringify({ chunkLength: chunk.text.length })}::jsonb,
+            NOW()
+          )
+        `;
+      }
     }
 
     // Update document status
@@ -243,152 +296,71 @@ export async function processDocument(
   }
 }
 
-function splitTextIntoChunks(
-  text: string,
-  chunkSize: number,
-  overlap: number
-): Array<{ text: string; startChar: number; endChar: number }> {
-  const chunks: Array<{ text: string; startChar: number; endChar: number }> = [];
+function splitTextIntoChunks(text: string, chunkSize: number, overlap: number): Array<{ text: string, startChar: number, endChar: number }> {
+  const chunks: Array<{ text: string, startChar: number, endChar: number }> = [];
+  if (!text || text.trim().length === 0) return chunks;
 
-  // Recursive character splitter implementation
-  // We explicitly want to split on these separators in order of precedence
-  const separators = ["\n\n", "\n", ". ", "! ", "? ", ";", ":", " ", ""];
-
-  function splitRecursive(
-    currentText: string,
-    currentStartOffset: number
-  ): void {
-    const length = currentText.length;
-
-    // If text fits in a chunk, just add it
-    if (length <= chunkSize) {
-      if (length > 0) {
-        chunks.push({
-          text: currentText,
-          startChar: currentStartOffset,
-          endChar: currentStartOffset + length
-        });
-      }
-      return;
-    }
-
-    // Otherwise, we leverage separators to find the best split point
-    let bestSplitIndex = -1;
-    let separatorUsed = '';
-
-    for (const separator of separators) {
-      if (separator === "") {
-        // If we get to the empty separator, we just hard split at chunkSize
-        bestSplitIndex = chunkSize;
-        separatorUsed = "";
-        break;
-      }
-
-      // Find the last occurrence of the separator within the chunkSize limit
-      // We want to maximize the chunk size while respecting semantic boundaries
-      const firstPart = currentText.substring(0, chunkSize + separator.length); // look a bit past to find the separator
-      const lastIndex = firstPart.lastIndexOf(separator);
-
-      if (lastIndex !== -1 && lastIndex < chunkSize) {
-        bestSplitIndex = lastIndex;
-        separatorUsed = separator;
-        break;
-      }
-    }
-
-    // If for some reason we couldn't find a split (shouldn't happen with "" separator), force split
-    if (bestSplitIndex === -1) {
-      bestSplitIndex = chunkSize;
-    }
-
-    // Add the first part
-    const chunkText = currentText.substring(0, bestSplitIndex + separatorUsed.length);
-    chunks.push({
-      text: chunkText,
-      startChar: currentStartOffset,
-      endChar: currentStartOffset + chunkText.length
-    });
-
-    // Calculate overlap start for the next chunk
-    // We want the next chunk to include some of the previous text for context
-    let nextStartInCurrent = bestSplitIndex + separatorUsed.length;
-
-    // Apply overlap by backtracking, but try to respect boundaries again?
-    // For simplicity in this robust implementation, we just effectively shift the window
-    // However, true overlap means we need to "unread" some characters or just send the rest
-    // Standard recursive splitters usually just recurse on the rest.
-    // To support overlap, we actually need a sliding window approach.
-
-    // Let's switch to a simpler Sliding Window approach with Semantic boundaries which is more robust for RAG.
-  }
-
-  // --- Better Sliding Window Implementation ---
-
+  const separators = ["\n\n", "\n", ". ", "? ", "! ", "; ", " ", ""];
   let currentStart = 0;
 
   while (currentStart < text.length) {
-    // 1. Determine potential end based on chunkSize
-    let potentialEnd = Math.min(currentStart + chunkSize, text.length);
-    let chunkEnd = potentialEnd;
+    let currentEnd = Math.min(currentStart + chunkSize, text.length);
+    let chunkEnd = currentEnd;
 
-    // 2. If we are not at the end of the text, try to walk back to the nearest separator
-    if (chunkEnd < text.length) {
-      let foundSeparator = false;
+    // If we're not at the end, find the best semantic break point looking backwards
+    if (currentEnd < text.length) {
+      // Look back up to half a chunk size to find a clean break
+      const lookBackLimit = Math.max(currentStart + Math.floor(chunkSize / 2), currentEnd - Math.floor(chunkSize / 2));
+      const searchWindow = text.substring(lookBackLimit, currentEnd);
+
+      let foundBreak = false;
       for (const sep of separators) {
-        if (sep === "") continue;
+        if (sep === "") {
+          chunkEnd = currentEnd; // Hard fallback
+          break;
+        }
 
-        // Search backwards from potentialEnd
-        // We look back up to 'overlap' distance or reasonable amount to find a break
-        const searchWindow = text.substring(Math.max(currentStart, potentialEnd - 100), potentialEnd + sep.length);
-        const lastIndexOfSep = searchWindow.lastIndexOf(sep);
-
-        if (lastIndexOfSep !== -1) {
-          // Adjust position relative to original text
-          const relativeIndex = Math.max(currentStart, potentialEnd - 100) + lastIndexOfSep + sep.length;
-          if (relativeIndex > currentStart && relativeIndex <= potentialEnd + sep.length) {
-            chunkEnd = relativeIndex;
-            foundSeparator = true;
-            break;
-          }
+        const lastIdx = searchWindow.lastIndexOf(sep);
+        if (lastIdx !== -1) {
+          chunkEnd = lookBackLimit + lastIdx + sep.length;
+          foundBreak = true;
+          break;
         }
       }
     }
 
-    const chunkText = text.slice(currentStart, chunkEnd);
-    chunks.push({
-      text: chunkText,
-      startChar: currentStart,
-      endChar: chunkEnd
-    });
+    const chunkText = text.substring(currentStart, chunkEnd).trim();
+    if (chunkText.length > 0) {
+      chunks.push({
+        text: chunkText,
+        startChar: currentStart,
+        endChar: currentStart + chunkText.length
+      });
+    }
 
-    // 3. Move start pointer forward, considering overlap
-    // New start should be (currentEnd - overlap)
-    // BUT we should also try to align the NEW start with a semantic boundary so we don't start in the middle of a word
+    if (chunkEnd >= text.length) {
+      break;
+    }
 
-    if (chunkEnd >= text.length) break;
-
+    // Advance currentStart with overlap
     let nextStart = chunkEnd - overlap;
 
-    // If overlap brings us back before currentStart, force forward progress
     if (nextStart <= currentStart) {
       nextStart = currentStart + Math.floor(chunkSize / 2);
     }
 
-    // Refine nextStart: try to find a sentence/word boundary *before* the calculated nextStart
-    // to ensure the overlap creates a clean start for the next chunk
-    let refinedNextStart = nextStart;
-    const lookbackRange = 50; // Text to look at around the overlap point
-    const overlapWindow = text.substring(Math.max(0, nextStart - lookbackRange), Math.min(text.length, nextStart + lookbackRange));
+    // Attempt to align the overlap start to a cleaner semantic boundary forward
+    const lookAheadWindow = text.substring(Math.max(0, nextStart - 50), Math.min(text.length, nextStart + 50));
+    let adjustedStart = nextStart;
 
-    // Try to find a sentence break near the overlap point
     for (const sep of ["\n\n", "\n", ". ", "? ", "! "]) {
-      const idx = overlapWindow.indexOf(sep);
-      if (idx !== -1) {
-        // Calculate absolute position
-        const absIndex = Math.max(0, nextStart - lookbackRange) + idx + sep.length;
-        // Ideally we want the start to be as close to 'nextStart' as possible, or slightly before
-        // This is a heuristic. Simpler is just to stick to the hard overlap or standard slicing.
-        // Let's simple-slide for now, the "End" optimization is the most important for reading quality.
+      const breakIdx = lookAheadWindow.indexOf(sep);
+      if (breakIdx !== -1) {
+        adjustedStart = Math.max(0, nextStart - 50) + breakIdx + sep.length;
+        if (adjustedStart > currentStart && adjustedStart < chunkEnd) {
+          nextStart = adjustedStart;
+          break;
+        }
       }
     }
 
@@ -411,8 +383,7 @@ export async function searchKnowledgeBase(
   knowledgeBaseId: string,
   query: string,
   limit: number = 5
-): Promise<Array<{ content: string; score: number; documentTitle: string; sourceUrl: string | null; chunkId: string }>> {
-  // Generate embedding for query
+) {
   const kb = await prisma.knowledgeBase.findUnique({
     where: { id: knowledgeBaseId },
   });
@@ -421,12 +392,29 @@ export async function searchKnowledgeBase(
     throw new KnowledgeBaseError("Knowledge base not found", 404);
   }
 
+  // Generate cache key
+  const queryHash = crypto.createHash("md5").update(query).digest("hex");
+  const cacheKey = `kb:search:${knowledgeBaseId}:${queryHash}:${limit}`;
+
+  // Check cache first
+  const cachedResults = await Cache.get<Array<{ content: string; score: number; documentTitle: string; sourceUrl: string | null; chunkId: string }>>(cacheKey);
+  if (cachedResults) {
+    logger.info('Cache hit for knowledge base search', { baseId: knowledgeBaseId, query: cacheKey });
+    return cachedResults;
+  }
+
   const queryEmbedding = await generateEmbedding(query, kb.embeddingModel);
   const vectorString = `[${queryEmbedding.join(',')}]`;
 
-  // Use pgvector for efficient cosine similarity search
-  // The <=> operator computes cosine distance (1 - cosine similarity)
-  // We order by distance ASC to get most similar chunks first
+  // Format query for PostgreSQL full-text search (BM25 style)
+  // Convert "What is Product X?" to "What | is | Product | X"
+  const ftsQuery = query.replace(/[^\w\s]/g, '').trim().split(/\s+/).join(' | ');
+
+  // Hybrid Search: Combine pgvector (Semantic) and tsvector (Keyword) via RRF
+  // 1. Get Top 20 Semantic Matches
+  // 2. Get Top 20 Keyword Matches
+  // 3. Combine and re-score
+
   const results = await prisma.$queryRaw<
     Array<{
       id: string;
@@ -434,32 +422,148 @@ export async function searchKnowledgeBase(
       distance: number;
       title: string;
       sourceUrl: string | null;
+      semantic_rank: number;
+      keyword_rank: number;
+      hybrid_score: number;
     }>
   >`
-    SELECT 
-      dc.id,
-      dc.content,
-      dc.embedding <=> ${vectorString}::vector(1536) as distance,
-      d.title,
-      d."sourceUrl"
-    FROM "document_chunks" dc
-    INNER JOIN "documents" d ON dc."documentId" = d.id
-    WHERE d."knowledgeBaseId" = ${knowledgeBaseId}
-      AND d.status = 'COMPLETED'
-      AND dc.embedding IS NOT NULL
-    ORDER BY dc.embedding <=> ${vectorString}::vector(1536)
+    WITH semantic_search AS (
+      SELECT 
+        dc.id,
+        dc.content,
+        dc.embedding <=> ${vectorString}::vector(1536) as distance,
+        d.title,
+        d."sourceUrl",
+        ROW_NUMBER() OVER (ORDER BY dc.embedding <=> ${vectorString}::vector(1536)) as semantic_rank
+      FROM "document_chunks" dc
+      INNER JOIN "documents" d ON dc."documentId" = d.id
+      WHERE d."knowledgeBaseId" = ${knowledgeBaseId}
+        AND d.status = 'COMPLETED'
+        AND dc.embedding IS NOT NULL
+      ORDER BY distance ASC
+      LIMIT 20
+    ),
+    keyword_search AS (
+      SELECT 
+        dc.id,
+        dc.content,
+        0::float as distance,
+        d.title,
+        d."sourceUrl",
+        ROW_NUMBER() OVER (ORDER BY ts_rank_cd(to_tsvector('english', dc.content), to_tsquery('english', ${ftsQuery})) DESC) as keyword_rank
+      FROM "document_chunks" dc
+      INNER JOIN "documents" d ON dc."documentId" = d.id
+      WHERE d."knowledgeBaseId" = ${knowledgeBaseId}
+        AND d.status = 'COMPLETED'
+        AND ${ftsQuery} != ''
+        AND to_tsvector('english', dc.content) @@ to_tsquery('english', ${ftsQuery})
+      ORDER BY keyword_rank ASC
+      LIMIT 20
+    ),
+    combined_results AS (
+      SELECT 
+        COALESCE(s.id, k.id) as id,
+        COALESCE(s.content, k.content) as content,
+        COALESCE(s.distance, 1.0) as distance,
+        COALESCE(s.title, k.title) as title,
+        COALESCE(s."sourceUrl", k."sourceUrl") as "sourceUrl",
+        COALESCE(s.semantic_rank, 60) as semantic_rank,
+        COALESCE(k.keyword_rank, 60) as keyword_rank
+      FROM semantic_search s
+      FULL OUTER JOIN keyword_search k ON s.id = k.id
+    )
+    SELECT
+      id,
+      content,
+      distance,
+      title,
+      "sourceUrl",
+      semantic_rank,
+      keyword_rank,
+      -- Reciprocal Rank Fusion (RRF) score: 1 / (60 + rank)
+      -- Higher score is better
+      (1.0 / (60.0 + semantic_rank)) + (1.0 / (60.0 + keyword_rank)) as hybrid_score
+    FROM combined_results
+    ORDER BY hybrid_score DESC
     LIMIT ${limit}
   `;
 
-  // Convert distance to similarity score (1 - distance)
-  // Since cosine distance = 1 - cosine similarity
-  return results.map((result) => ({
-    chunkId: result.id,
-    content: result.content,
-    score: 1 - result.distance, // Convert distance back to similarity
-    documentTitle: result.title,
-    sourceUrl: result.sourceUrl,
-  }));
+  // Provide a generous MIN_SIMILARITY threshold because hybrid RRF scores are naturally lower floats
+  const MIN_SIMILARITY = 0.005; // Adjusted for RRF (typical max is ~0.033)
+
+  // Convert distance to similarity score
+  let filteredResults = results
+    .map((result) => ({
+      chunkId: result.id,
+      content: result.content,
+      score: result.hybrid_score, // Use the new RRF hybrid score
+      documentTitle: result.title,
+      sourceUrl: result.sourceUrl,
+    }))
+    .filter((result) => result.score >= MIN_SIMILARITY);
+
+  // --- LLM Cross-Encoder Re-Ranking ---
+  // If we have more results than the limit, we'll ask the LLM to judge relevance
+  if (filteredResults.length > limit) {
+    try {
+      const { generateChatCompletion } = await import("../lib/openai");
+
+      const chunksData = filteredResults.map((r, i) => `[ID: ${i}] ${r.content}`).join("\n\n---\n\n");
+      const rerankPrompt = `You are an expert system that re-ranks search results based on a user's query.\n\nQuery: "${query}"\n\nAnalyze the following document chunks and score their relevance to the query from 0 to 10 (10 being a perfect direct answer, 0 being completely irrelevant).\n\nChunks:\n${chunksData}\n\nReturn EXACTLY a JSON array of objects, with each object containing "id" (the chunk ID integer) and "score" (your 0-10 relevance score). Do NOT return markdown formatting like \`\`\`json. Just the raw JSON array.`;
+
+      const rerankResponse = await generateChatCompletion([
+        { role: "system", content: "You are a JSON-only API. Only output valid JSON arrays." },
+        { role: "user", content: rerankPrompt }
+      ], "gpt-4o-mini", { temperature: 0, max_tokens: 1000 });
+
+      let llmScores: Array<{ id: number, score: number }> = [];
+      try {
+        const rawContent = rerankResponse.choices?.[0]?.message?.content?.trim() || "[]";
+        // Clean up any accidental markdown
+        const cleanJson = rawContent.replace(/^```json\s*/, '').replace(/```$/, '').trim();
+        llmScores = JSON.parse(cleanJson);
+
+        // Map the LLM scores back to our results
+        if (Array.isArray(llmScores)) {
+          filteredResults = filteredResults.map((result, index) => {
+            const llmJudge = llmScores.find(s => s.id === index);
+            if (llmJudge && typeof llmJudge.score === 'number') {
+              // Override the hybrid score with the much smarter LLM score
+              return { ...result, score: llmJudge.score };
+            }
+            return { ...result, score: 0 }; // Demote if the LLM didn't score it
+          });
+
+          // Re-sort descending and apply the final strict limit limit
+          filteredResults = filteredResults
+            .sort((a, b) => b.score - a.score)
+            .filter(r => r.score > 2) // Must be at least somewhat relevant
+            .slice(0, limit);
+
+          logger.info("LLM Re-Ranking applied successfully", { baseId: knowledgeBaseId, originalCount: results.length, finalCount: filteredResults.length });
+        }
+      } catch (jsonErr) {
+        logger.warn("LLM Re-Ranking returned invalid JSON, falling back to raw Hybrid Search", { baseId: knowledgeBaseId, error: jsonErr });
+        filteredResults = filteredResults.slice(0, limit);
+      }
+    } catch (rerankErr) {
+      logger.warn("LLM Re-Ranking failed, falling back to raw Hybrid Search", { baseId: knowledgeBaseId, error: rerankErr });
+      filteredResults = filteredResults.slice(0, limit);
+    }
+  } else {
+    filteredResults = filteredResults.slice(0, limit);
+  }
+
+  // Store in cache for 10 minutes (600 seconds)
+  try {
+    if (filteredResults.length > 0) {
+      await Cache.set(cacheKey, filteredResults, 600);
+    }
+  } catch (cacheErr) {
+    logger.error('Failed to set cache for knowledge base search', { baseId: knowledgeBaseId, query: cacheKey, error: cacheErr });
+  }
+
+  return filteredResults;
 }
 
 function cosineSimilarity(a: number[], b: number[]): number {

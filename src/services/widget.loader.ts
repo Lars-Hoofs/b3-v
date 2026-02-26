@@ -12,7 +12,7 @@
  */
 
 export function generateWidgetLoader(): string {
-    return `(function() {
+  return `(function() {
   'use strict';
 
   var config = window.aiChatConfig;
@@ -186,20 +186,74 @@ export function generateWidgetLoader(): string {
       return;
     }
 
+    // Keep track of streaming message elements
+    var streamElements = {};
+
     socket.on('ai:thinking', function() {
       var typing = document.getElementById('ai-chat-typing');
       if (typing) typing.style.display = 'block';
     });
 
+    socket.on('ai:stream:start', function(data) {
+      var typing = document.getElementById('ai-chat-typing');
+      if (typing) typing.style.display = 'none';
+      
+      // Create empty message container
+      var msgDiv = appendMessage('', false);
+      msgDiv.id = 'msg-' + data.id;
+      streamElements[data.id] = msgDiv;
+    });
+
+    socket.on('ai:stream:chunk', function(data) {
+      var msgDiv = streamElements[data.id];
+      if (msgDiv) {
+        // Simple append for now, replace newlines
+        // In a real app we'd run markdown parsing here
+        var textNode = document.createTextNode(data.content);
+        if (data.content.includes('\\n')) {
+          var parts = data.content.split('\\n');
+          for (var i = 0; i < parts.length; i++) {
+            msgDiv.appendChild(document.createTextNode(parts[i]));
+            if (i < parts.length - 1) msgDiv.appendChild(document.createElement('br'));
+          }
+        } else {
+          msgDiv.appendChild(textNode);
+        }
+        
+        var messages = document.getElementById('ai-chat-messages');
+        if (messages) messages.scrollTop = messages.scrollHeight;
+      }
+    });
+
+    socket.on('ai:stream:end', function(data) {
+      // Cleanup reference
+      delete streamElements[data.id];
+    });
+
     socket.on('ai:response', function(data) {
       var typing = document.getElementById('ai-chat-typing');
       if (typing) typing.style.display = 'none';
-      appendMessage(data.content, false, data.metadata && data.metadata.sources);
+      
+      // Only append if it wasn't streamed (fallback)
+      if (!document.getElementById('msg-' + data.id)) {
+        var msgDiv = appendMessage(data.content, false, data.metadata && data.metadata.sources);
+        msgDiv.id = 'msg-' + data.id;
+      } else {
+        // If it was streamed, we might want to append sources now
+        var msgDiv = document.getElementById('msg-' + data.id);
+        if (msgDiv && data.metadata && data.metadata.sources && data.metadata.sources.length > 0) {
+          appendSources(msgDiv, data.metadata.sources);
+        }
+      }
     });
 
     socket.on('message:new', function(data) {
       if (data.role && data.role.toLowerCase() === 'user') return;
-      appendMessage(data.content, false);
+      // Also check if we already have this message from streaming
+      if (data.id && document.getElementById('msg-' + data.id)) return;
+      
+      var msgDiv = appendMessage(data.content, false);
+      if (data.id) msgDiv.id = 'msg-' + data.id;
     });
 
     // Create conversation
@@ -316,10 +370,19 @@ export function generateWidgetLoader(): string {
       'animation: slideIn 0.3s cubic-bezier(0.2, 0.8, 0.2, 1)',
     ].join('; ');
 
-    div.innerHTML = content.replace(/\\n/g, '<br>');
+    div.innerHTML = content ? content.replace(/\\n/g, '<br>') : '';
 
-    // Sources (favicons)
     if (!isUser && sources && sources.length > 0) {
+      appendSources(div, sources);
+    }
+
+    messages.appendChild(div);
+    messages.scrollTop = messages.scrollHeight;
+    
+    return div; // Return the element so we can modify it later (e.g. streaming)
+  }
+
+  function appendSources(div, sources) {
       var sourcesDiv = document.createElement('div');
       sourcesDiv.style.cssText = 'margin-top: 12px; padding-top: 10px; border-top: 1px solid rgba(0,0,0,0.05); display: flex; gap: 8px; flex-wrap: wrap;';
 
@@ -344,10 +407,6 @@ export function generateWidgetLoader(): string {
       });
 
       if (hasValid) div.appendChild(sourcesDiv);
-    }
-
-    messages.appendChild(div);
-    messages.scrollTop = messages.scrollHeight;
   }
 
   function showSuggestedQuestions(questions) {

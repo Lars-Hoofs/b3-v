@@ -3,6 +3,7 @@ export type SendMessageInput = z.infer<typeof sendMessageSchema>;
 
 import { Router } from "express";
 import { requireAuth, AuthRequest } from "../middleware/auth.middleware";
+import { chatLimiter, apiLimiter } from "../middleware/rateLimits";
 import * as chatService from "../services/chat.service";
 import { ChatError } from "../services/chat.service";
 import { z } from "zod";
@@ -19,7 +20,7 @@ export const startConversationSchema = z.object({
 });
 
 // Start conversation (PUBLIC)
-router.post("/conversations/start", async (req, res) => {
+router.post("/conversations/start", apiLimiter, async (req, res) => {
   try {
     const data = startConversationSchema.parse(req.body);
     const conversation = await chatService.startConversation(data);
@@ -77,7 +78,7 @@ export const sendMessageSchema = z.object({
 });
 
 // Send message (PUBLIC for USER, authenticated for AGENT)
-router.post("/messages", async (req, res) => {
+router.post("/messages", chatLimiter, async (req, res) => {
   try {
     const data = sendMessageSchema.parse(req.body);
 
