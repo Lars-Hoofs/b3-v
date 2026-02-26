@@ -371,7 +371,18 @@ function renderChatBlock(block: ChatBlock, cfg: WidgetConfig, depth: number = 0)
             break;
 
         case 'text':
-            content = `<div id="${blockId}"${mobileHidden} style="padding: 8px 16px; ${userStyles}">${escapeHtml(block.content || '')}${childrenHtml}</div>`;
+            content = `<div id="${blockId}"${mobileHidden} style="padding: 0; margin: 0; ${userStyles}">${escapeHtml(block.content || '')}${childrenHtml}</div>`;
+            break;
+
+        case 'icon': {
+            const iconColor = (block.style && block.style.color) || 'currentColor';
+            const iconSize = (block.style && block.style.fontSize) ? parseInt(block.style.fontSize) : 24;
+            content = `<div id="${blockId}"${mobileHidden} style="display: flex; align-items: center; justify-content: center; ${userStyles}">${iconHtml(block.content, iconSize, iconColor)}</div>`;
+            break;
+        }
+
+        case 'image':
+            content = `<img id="${blockId}"${mobileHidden} src="${escapeHtml(block.content || '')}" style="display: block; max-width: 100%; height: auto; ${userStyles}" alt="" />`;
             break;
 
         case 'button': {
