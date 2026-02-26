@@ -35,7 +35,6 @@ import scraperRoutes from "./routes/scraper.routes";
 import dashboardRoutes from "./routes/dashboard.routes";
 import presenceRoutes from "./routes/presence.routes";
 import superadminRoutes from "./routes/superadmin.routes";
-import { generateWidgetScript } from "./services/widget.service";
 import socketService from "./services/socket.service";
 
 const app = express();
