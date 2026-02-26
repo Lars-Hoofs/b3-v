@@ -597,8 +597,8 @@ router.get("/render/:installCode", async (req, res) => {
   }
 });
 
-// Widget preview (authenticated - for testing widget appearance)
-router.post("/preview-html", requireAuth, async (req: AuthRequest, res) => {
+// Widget preview (unauthenticated - pure function for testing widget appearance)
+router.post("/preview-html", async (req, res) => {
   try {
     const config = req.body;
     const html = renderWidgetHTML(config as any);
