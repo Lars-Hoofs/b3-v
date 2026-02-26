@@ -490,18 +490,29 @@ function renderChatWindow(cfg: WidgetConfig): string {
 
     // Chat window container styles
     const chatWidth = cfg.chatWidth || 380;
-    const chatHeight = cfg.chatHeight || 650;
-    const chatRadius = cfg.chatBorderRadius || 24;
+    let chatHeightStr = `${cfg.chatHeight || 650}px`;
+    let maxHeightStr = `calc(100dvh - ${40 + (cfg.offsetY || 0)}px)`;
+    let chatRadiusStr = `${cfg.chatBorderRadius !== undefined ? cfg.chatBorderRadius : 24}px`;
+
+    if (cfg.layoutMode === 'full-height') {
+        chatHeightStr = '100dvh';
+        maxHeightStr = '100dvh';
+        chatRadiusStr = '0px';
+    }
+
+    const fontFamilyStr = cfg.fontFamily ? `'${cfg.fontFamily}', sans-serif` : "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
 
     const chatWindowStyle = [
         `width: ${chatWidth}px`,
-        `height: ${chatHeight}px`,
-        `border-radius: ${chatRadius}px`,
+        `height: ${chatHeightStr}`,
+        `max-height: ${maxHeightStr}`,
+        `max-width: calc(100vw - 40px)`,
+        `border-radius: ${chatRadiusStr}`,
         'overflow: hidden',
         'display: none',
         'flex-direction: column',
         'box-shadow: 0 20px 60px rgba(0,0,0,0.15), 0 8px 20px rgba(0,0,0,0.1)',
-        "font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
+        `font-family: ${fontFamilyStr}`,
         `background: ${cfg.chatBackgroundColor || '#ffffff'}`,
         `z-index: ${cfg.zIndex || 999999}`,
     ].join('; ');
@@ -608,7 +619,15 @@ export function renderWidgetHTML(cfg: WidgetConfig): string {
         'middle-right': `top: 50%; right: ${20 - offsetX}px; transform: translateY(calc(-50% + ${offsetY}px));`,
     };
 
-    const positionStyle = positions[cfg.position] || positions['bottom-right'];
+    let positionStyle = positions[cfg.position] || positions['bottom-right'];
+
+    // Auto adjust wrapper if Chat is full-height
+    if (cfg.layoutMode === 'full-height') {
+        if (cfg.position.includes('right')) positionStyle = `bottom: 0; right: ${offsetX}px;`;
+        else if (cfg.position.includes('left')) positionStyle = `bottom: 0; left: ${offsetX}px;`;
+        else positionStyle = `bottom: 0; right: ${offsetX}px;`;
+    }
+
     const containerStyle = `position: fixed; z-index: ${cfg.zIndex || 999999}; ${positionStyle}`;
 
     // Data attributes for runtime behavior (read by widget loader script)
@@ -627,6 +646,14 @@ export function renderWidgetHTML(cfg: WidgetConfig): string {
     ].filter(Boolean).join(' ');
 
     let html = '';
+    html += `<link href="https://cdn.jsdelivr.net/npm/remixicon@3.5.0/fonts/remixicon.css" rel="stylesheet">`;
+    if (cfg.fontFamily) {
+        const familyStr = cfg.fontFamily.replace(/ /g, '+');
+        html += `<link href="https://fonts.googleapis.com/css2?family=${familyStr}:wght@400;500;600;700&display=swap" rel="stylesheet">`;
+    } else {
+        html += `<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">`;
+    }
+
     html += renderStyles(cfg);
     html += `<div id="ai-chat-widget-container" style="${containerStyle}" ${dataAttrs}>`;
     html += renderLauncher(cfg);
