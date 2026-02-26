@@ -24,6 +24,8 @@ interface LauncherBlock {
     onClick?: string;
     url?: string;
     mobileHidden?: boolean;
+    splitRatio?: number;
+    statusType?: string;
 }
 
 interface ChatBlock {
@@ -36,6 +38,8 @@ interface ChatBlock {
     onClick?: string;
     url?: string;
     mobileHidden?: boolean;
+    splitRatio?: number;
+    statusType?: string;
 }
 
 // ─── HELPERS ─────────────────────────────────────────────────────────
@@ -140,6 +144,24 @@ function renderLauncherBlock(block: LauncherBlock, depth: number = 0): string {
 
         case 'image':
             content = `<img src="${escapeHtml(block.content || '')}" style="display: block; max-width: 100%; height: auto;" alt="" />`;
+            break;
+
+        case 'split':
+            const lRatio = block.splitRatio || 50;
+            baseStyles = 'display: flex; flex-direction: row; width: 100%;';
+            if (block.children && block.children.length === 2) {
+                const left = renderLauncherBlock(block.children[0], depth + 1);
+                const right = renderLauncherBlock(block.children[1], depth + 1);
+                content = `<div style="flex: ${lRatio}; min-width: 0;">${left}</div><div style="flex: ${100 - lRatio}; min-width: 0;">${right}</div>`;
+            } else if (block.children) {
+                content = block.children.map(c => renderLauncherBlock(c, depth + 1)).join('');
+            }
+            break;
+
+        case 'status':
+            const typeClass = block.statusType || 'online';
+            const color = typeClass === 'online' ? '#10b981' : typeClass === 'away' ? '#f59e0b' : '#9ca3af';
+            content = `<span style="width: 10px; height: 10px; background: ${color}; border-radius: 50%; display: inline-block; box-shadow: 0 0 0 2px #fff;"></span>`;
             break;
 
         default:
@@ -369,6 +391,26 @@ function renderChatBlock(block: ChatBlock, cfg: WidgetConfig, depth: number = 0)
         case 'container':
             content = `<div id="${blockId}"${mobileHidden} style="${userStyles}">${childrenHtml}</div>`;
             break;
+
+        case 'split': {
+            const ratio = block.splitRatio || 50;
+            const splitStyle = `display: flex; flex-direction: row; width: 100%; ${userStyles}`;
+            if (block.children && block.children.length === 2) {
+                const left = renderChatBlock(block.children[0], cfg, depth + 1);
+                const right = renderChatBlock(block.children[1], cfg, depth + 1);
+                content = `<div id="${blockId}"${mobileHidden} style="${splitStyle}"><div style="flex: ${ratio}; min-width: 0;">${left}</div><div style="flex: ${100 - ratio}; min-width: 0;">${right}</div></div>`;
+            } else {
+                content = `<div id="${blockId}"${mobileHidden} style="${splitStyle}">${childrenHtml}</div>`;
+            }
+            break;
+        }
+
+        case 'status': {
+            const typeClass = block.statusType || 'online';
+            const color = typeClass === 'online' ? '#10b981' : typeClass === 'away' ? '#f59e0b' : '#9ca3af';
+            content = `<div id="${blockId}"${mobileHidden} style="width: 10px; height: 10px; background: ${color}; border-radius: 50%; display: inline-block; box-shadow: 0 0 0 2px inherit; flex-shrink: 0; ${userStyles}"></div>`;
+            break;
+        }
 
         case 'text':
             content = `<div id="${blockId}"${mobileHidden} style="padding: 0; margin: 0; ${userStyles}">${escapeHtml(block.content || '')}${childrenHtml}</div>`;
