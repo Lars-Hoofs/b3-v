@@ -26,6 +26,7 @@ interface LauncherBlock {
     mobileHidden?: boolean;
     splitRatio?: number;
     statusType?: string;
+    animation?: { type: string; duration: number; delay: number; easing: string; trigger: string; repeat: number; };
 }
 
 interface ChatBlock {
@@ -40,6 +41,7 @@ interface ChatBlock {
     mobileHidden?: boolean;
     splitRatio?: number;
     statusType?: string;
+    animation?: { type: string; duration: number; delay: number; easing: string; trigger: string; repeat: number; };
 }
 
 // ─── HELPERS ─────────────────────────────────────────────────────────
@@ -113,6 +115,9 @@ function renderLauncherBlock(block: LauncherBlock, depth: number = 0): string {
     if (!block || !block.id) return '';
 
     const blockId = 'launcher-block-' + block.id;
+    const animAttr = block.animation && block.animation.type !== 'none'
+        ? ` data-gsap-anim='${JSON.stringify(block.animation)}'`
+        : '';
 
     // Build inline styles from block.style
     const userStyles = block.style ? styleObj(block.style) : '';
@@ -710,6 +715,46 @@ export function renderWidgetHTML(cfg: WidgetConfig): string {
     html += renderLauncher(cfg);
     html += renderChatWindow(cfg);
     html += '</div>';
+
+    // GSAP CDN + animation init
+    html += `<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js" defer></script>`;
+    html += `<script>
+(function() {
+  var ANIM_MAP = {
+    fadeIn:    { opacity: 0 },
+    fadeUp:    { opacity: 0, y: 30 },
+    fadeDown:  { opacity: 0, y: -30 },
+    fadeLeft:  { opacity: 0, x: 30 },
+    fadeRight: { opacity: 0, x: -30 },
+    scaleIn:   { opacity: 0, scale: 0.8 },
+    scaleUp:   { opacity: 0, scale: 0 },
+    bounce:    { opacity: 0, y: 40 },
+    rotateIn:  { opacity: 0, rotation: -90, transformOrigin: 'center' },
+    flipX:     { opacity: 0, rotationX: 90 },
+    flipY:     { opacity: 0, rotationY: 90 },
+    shake:     { x: -8 },
+    pulse:     { scale: 0.9 },
+    slideLeft: { x: '-100%', opacity: 0 },
+    slideRight:{ x: '100%', opacity: 0 },
+    zoomIn:    { scale: 1.4, opacity: 0 },
+  };
+  function runAnimations() {
+    if (typeof gsap === 'undefined') return;
+    var els = document.querySelectorAll('[data-gsap-anim]');
+    els.forEach(function(el) {
+      try {
+        var cfg = JSON.parse(el.getAttribute('data-gsap-anim'));
+        if (!cfg || cfg.type === 'none') return;
+        var from = ANIM_MAP[cfg.type];
+        if (!from) return;
+        gsap.from(el, Object.assign({}, from, { duration: cfg.duration || 0.6, delay: cfg.delay || 0, ease: cfg.easing || 'power2.out', repeat: cfg.repeat === -1 ? -1 : (cfg.repeat || 0) }));
+      } catch(e) {}
+    });
+  }
+  document.addEventListener('DOMContentLoaded', runAnimations);
+  document.addEventListener('ai-widget-opened', runAnimations);
+})();
+</script>`;
 
     return html;
 }
