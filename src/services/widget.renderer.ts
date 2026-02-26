@@ -317,7 +317,16 @@ function renderChatBlock(block: ChatBlock, cfg: WidgetConfig, depth: number = 0)
         case 'header': {
             const headerBg = (block.style && block.style.background) ? '' : `background: ${cfg.headerBackgroundColor || '#ffffff'}; color: ${cfg.headerTextColor || '#000000'};`;
             const headerBorder = (block.style && block.style.borderBottom) ? '' : 'border-bottom: 1px solid rgba(0,0,0,0.05);';
+
+            // If user built custom children in Chat Builder, use those instead of default layout
+            if (block.children && block.children.length > 0) {
+                const cs = `${userStyles} ${headerBg} ${headerBorder}`;
+                content = `<div id="${blockId}"${mobileHidden} style="${cs}">${childrenHtml}</div>`;
+                break;
+            }
+
             const headerStyle = `padding: 20px 24px; display: flex; align-items: center; justify-content: space-between; ${headerBorder} ${headerBg} ${userStyles}`;
+
 
             // Avatar
             let avatarHtml = '';
